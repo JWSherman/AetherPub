@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AetherPub – Daily E-Reader EPUB Engine</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        zinc: {
+                            950: '#09090b',
+                            900: '#121217',
+                            800: '#1c1c24',
+                            700: '#272732',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Custom Cyberpunk Dark Stylesheet -->
+    <link rel="stylesheet" href="/static/css/custom.css">
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen flex flex-col antialiased selection:bg-cyan-500 selection:text-black">
+
+    <!-- Top Glow Header -->
+    <header class="sticky top-0 z-40 border-b border-white/10 bg-zinc-950/80 backdrop-blur-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+            
+            <!-- Brand & Status -->
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 to-violet-600 p-0.5 shadow-lg shadow-cyan-500/20">
+                        <div class="w-full h-full bg-zinc-950 rounded-[10px] flex items-center justify-center">
+                            <i data-lucide="book-marked" class="w-5 h-5 text-cyan-400"></i>
+                        </div>
+                    </div>
+                    <div>
+                        <h1 class="font-extrabold text-base tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-sky-300 to-violet-400">
+                            AETHERPUB
+                        </h1>
+                        <span class="text-[10px] font-mono tracking-widest text-zinc-400 block -mt-1">DAILY E-READER DIGEST</span>
+                    </div>
+                </div>
+
+                <div class="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-white/5 ml-4">
+                    <div id="system-status-dot" class="w-2 h-2 rounded-full bg-emerald-400"></div>
+                    <span id="system-status-text" class="text-xs font-mono text-emerald-400">System Active (Idle)</span>
+                </div>
+            </div>
+
+            <!-- Quick Action Bar -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <button id="btn-crawl-all" class="px-3.5 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-cyan-500/30 text-cyan-400 hover:text-cyan-300 text-xs font-mono font-medium flex items-center gap-1.5 transition-all shadow-sm">
+                    <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+                    <span class="hidden sm:inline">Ingest All Sources</span>
+                </button>
+                <button id="btn-compile-now" class="px-3.5 py-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white text-xs font-mono font-semibold flex items-center gap-1.5 transition-all shadow-lg shadow-violet-600/30">
+                    <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+                    <span>Compile Digest Now</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Navigation Bar -->
+    <nav class="border-b border-white/5 bg-zinc-900/50 backdrop-blur-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center space-x-1 sm:space-x-2 overflow-x-auto py-2">
+            <button data-tab="dashboard" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-2 border bg-zinc-800 text-cyan-400 border-cyan-500/40 transition-all">
+                <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Overview
+            </button>
+            <button data-tab="sources" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-2 border border-transparent text-zinc-400 hover:text-zinc-200 transition-all">
+                <i data-lucide="globe" class="w-4 h-4"></i> Website Sources
+            </button>
+            <button data-tab="keywords" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-2 border border-transparent text-zinc-400 hover:text-zinc-200 transition-all">
+                <i data-lucide="sliders" class="w-4 h-4"></i> Keyword Matrix
+            </button>
+            <button data-tab="editions" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-2 border border-transparent text-zinc-400 hover:text-zinc-200 transition-all">
+                <i data-lucide="library" class="w-4 h-4"></i> Daily Digests
+            </button>
+            <button data-tab="articles" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-2 border border-transparent text-zinc-400 hover:text-zinc-200 transition-all">
+                <i data-lucide="file-text" class="w-4 h-4"></i> Ingested Articles
+            </button>
+            <button data-tab="settings" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-2 border border-transparent text-zinc-400 hover:text-zinc-200 transition-all ml-auto">
+                <i data-lucide="settings" class="w-4 h-4"></i> Settings & SMTP
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- TAB: DASHBOARD -->
+        <section id="tab-dashboard" class="tab-content space-y-6">
+            
+            <!-- KPI Counters -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="glass-panel p-4 rounded-xl">
+                    <span class="text-xs font-mono text-zinc-400 flex items-center gap-1.5">
+                        <i data-lucide="globe" class="w-3.5 h-3.5 text-cyan-400"></i> Tracked Sources
+                    </span>
+                    <div id="kpi-sources" class="text-2xl font-bold text-white mt-1">0</div>
+                </div>
+                <div class="glass-panel p-4 rounded-xl">
+                    <span class="text-xs font-mono text-zinc-400 flex items-center gap-1.5">
+                        <i data-lucide="sliders" class="w-3.5 h-3.5 text-violet-400"></i> Active Keywords
+                    </span>
+                    <div id="kpi-keywords" class="text-2xl font-bold text-white mt-1">0</div>
+                </div>
+                <div class="glass-panel p-4 rounded-xl">
+                    <span class="text-xs font-mono text-zinc-400 flex items-center gap-1.5">
+                        <i data-lucide="file-check" class="w-3.5 h-3.5 text-emerald-400"></i> Ready to Bundle
+                    </span>
+                    <div id="kpi-articles" class="text-2xl font-bold text-white mt-1">0</div>
+                </div>
+                <div class="glass-panel p-4 rounded-xl">
+                    <span class="text-xs font-mono text-zinc-400 flex items-center gap-1.5">
+                        <i data-lucide="book" class="w-3.5 h-3.5 text-amber-400"></i> Compiled Editions
+                    </span>
+                    <div id="kpi-editions" class="text-2xl font-bold text-white mt-1">0</div>
+                </div>
+            </div>
+
+            <!-- Latest Edition Card Banner -->
+            <div id="dashboard-latest-edition" class="glass-panel p-5 rounded-xl border-l-4 border-l-cyan-500">
+                <!-- Dynamically populated -->
+            </div>
+
+            <!-- Reactive Cyberpunk Live Telemetry Drawer -->
+            <div class="glass-panel rounded-xl overflow-hidden border border-zinc-800">
+                <div class="px-4 py-3 bg-zinc-900/80 border-b border-zinc-800 flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <div class="flex gap-1.5">
+                            <span class="w-2.5 h-2.5 rounded-full bg-rose-500/80"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-amber-500/80"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500/80"></span>
+                        </div>
+                        <span class="text-xs font-mono font-semibold text-zinc-300 ml-2">LIVE PIPELINE TELEMETRY (SSE STREAM)</span>
+                    </div>
+                    <span class="text-[11px] font-mono text-zinc-500">Auto-scrolling</span>
+                </div>
+                <div id="telemetry-console" class="p-4 bg-zinc-950/90 h-56 overflow-y-auto space-y-1 font-mono text-xs select-text">
+                    <div class="text-zinc-500">[System] Initializing AetherPub Reactive Telemetry Channel...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB: WEBSITE SOURCES -->
+        <section id="tab-sources" class="tab-content hidden space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Monitored Website Repositories</h2>
+                    <p class="text-xs text-zinc-400 mt-0.5">Manage URLs, RSS feeds, and automated crawler behavior.</p>
+                </div>
+                <button id="btn-open-add-source" class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs flex items-center gap-1.5 transition-all shadow-lg shadow-cyan-500/20">
+                    <i data-lucide="plus" class="w-4 h-4"></i> Add Website
+                </button>
+            </div>
+
+            <!-- Sources Grid -->
+            <div id="sources-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Dynamically rendered -->
+            </div>
+        </section>
+
+        <!-- TAB: KEYWORDS & INTEREST MATRIX -->
+        <section id="tab-keywords" class="tab-content hidden space-y-8">
+            <div>
+                <h2 class="text-xl font-bold text-white">Keyword Curation Matrix</h2>
+                <p class="text-xs text-zinc-400 mt-0.5">Define topics, positive/negative weights, and required terms to score articles.</p>
+            </div>
+
+            <!-- Add Keyword Card -->
+            <div class="glass-panel p-5 rounded-xl">
+                <h3 class="text-sm font-semibold text-white mb-3">Add / Adjust Keyword Rule</h3>
+                <form id="keyword-form" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div class="sm:col-span-2">
+                        <label class="text-[11px] font-mono text-zinc-400 block mb-1">Term or Phrase</label>
+                        <input id="kw-term-input" type="text" placeholder="e.g. artificial intelligence, rust, kindle" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500" required>
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-mono text-zinc-400 block mb-1">Rule Type</label>
+                        <select id="kw-type-select" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                            <option value="weighted">Weighted Interest</option>
+                            <option value="required">[+] Required (Must be present)</option>
+                            <option value="excluded">[-] Excluded (Discard immediately)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[11px] font-mono text-zinc-400 block mb-1">Weight Multiplier (-5 to +5)</label>
+                        <div class="flex items-center gap-2">
+                            <input id="kw-weight-input" type="number" step="0.5" value="1.0" min="-5" max="10" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                            <button type="submit" class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs whitespace-nowrap">
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Active Keywords Chips Grid -->
+            <div>
+                <h3 class="text-sm font-semibold text-white mb-3">Active Rules</h3>
+                <div id="keywords-list">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+
+            <!-- Interactive Keyword Sandbox -->
+            <div class="glass-panel p-5 rounded-xl border-t-2 border-t-violet-500">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <h3 class="text-sm font-semibold text-white">Keyword Scoring Sandbox (Dry-Run Tester)</h3>
+                        <p class="text-xs text-zinc-400">Test how your active rules evaluate an article URL or text snippet.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">Test by URL (optional)</label>
+                            <input id="sandbox-url-input" type="url" placeholder="https://example.com/article" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">Or Sample Title</label>
+                            <input id="sandbox-title-input" type="text" placeholder="Title for testing" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">Sample Body Text</label>
+                            <textarea id="sandbox-content-input" rows="4" placeholder="Paste article paragraph here..." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500"></textarea>
+                        </div>
+                        <button id="sandbox-evaluate-btn" class="w-full py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-all">
+                            <i data-lucide="play" class="w-3.5 h-3.5"></i> Run Scoring Test
+                        </button>
+                    </div>
+
+                    <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 flex flex-col justify-between">
+                        <div>
+                            <span class="text-xs font-mono text-zinc-400 uppercase tracking-wider block mb-2">Scoring Breakdown</span>
+                            <div id="sandbox-results" class="space-y-2">
+                                <p class="text-zinc-600 font-mono text-xs italic">Submit sample text on the left to see score calculation.</p>
+                            </div>
+                        </div>
+                        <div class="mt-4 pt-3 border-t border-zinc-800/80 text-[11px] text-zinc-500 font-mono">
+                            Scoring formula: Title hits (3x) + Body hits (1x) &times; Weight.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB: DAILY EDITIONS ARCHIVE -->
+        <section id="tab-editions" class="tab-content hidden space-y-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Daily Digest EPUB Archive</h2>
+                    <p class="text-xs text-zinc-400 mt-0.5">Download or wirelessly send compiled periodicals to your e-reader.</p>
+                </div>
+                <button onclick="triggerCompileNow()" class="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs flex items-center gap-1.5 transition-all shadow-lg shadow-violet-600/30">
+                    <i data-lucide="layers" class="w-4 h-4"></i> Compile New Digest
+                </button>
+            </div>
+
+            <!-- Editions Card Grid -->
+            <div id="editions-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Populated dynamically -->
+            </div>
+        </section>
+
+        <!-- TAB: INGESTED ARTICLES -->
+        <section id="tab-articles" class="tab-content hidden space-y-6">
+            <div>
+                <h2 class="text-xl font-bold text-white">Ingested Articles Pool</h2>
+                <p class="text-xs text-zinc-400 mt-0.5">Scored articles discovered from tracked sources, awaiting daily bundling.</p>
+            </div>
+
+            <div id="articles-list" class="space-y-3">
+                <!-- Populated dynamically -->
+            </div>
+        </section>
+
+        <!-- TAB: SETTINGS & SMTP -->
+        <section id="tab-settings" class="tab-content hidden space-y-6">
+            <div>
+                <h2 class="text-xl font-bold text-white">System Settings & SMTP Delivery</h2>
+                <p class="text-xs text-zinc-400 mt-0.5">Configure schedule cron, daily quota, and Amazon Send-to-Kindle credentials.</p>
+            </div>
+
+            <form id="settings-form" class="space-y-6">
+                
+                <!-- Automation Settings -->
+                <div class="glass-panel p-5 rounded-xl space-y-4">
+                    <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                        <i data-lucide="clock" class="w-4 h-4 text-cyan-400"></i> Daily Schedule & Quotas
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div>
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">Scheduled Hour (0-23)</label>
+                            <input id="cfg-cron-hour" type="number" min="0" max="23" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">Scheduled Minute (0-59)</label>
+                            <input id="cfg-cron-minute" type="number" min="0" max="59" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">Daily Article Limit</label>
+                            <input id="cfg-daily-limit" type="number" min="1" max="100" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SMTP & Kindle Settings -->
+                <div class="glass-panel p-5 rounded-xl space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                            <i data-lucide="mail" class="w-4 h-4 text-violet-400"></i> Send-to-Kindle (SMTP Configuration)
+                        </h3>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input id="cfg-auto-send" type="checkbox" class="rounded bg-zinc-900 border-zinc-700 text-violet-500 focus:ring-0">
+                            <span class="text-xs font-mono text-zinc-300">Auto-send upon daily build</span>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="sm:col-span-2">
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">Target E-Reader Email (e.g. user@kindle.com)</label>
+                            <input id="cfg-kindle-email" type="email" placeholder="username@kindle.com" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                            <span class="text-[10px] text-zinc-500 mt-1 block">Ensure the "From Email" below is added to your Amazon Approved Personal Document E-mail List.</span>
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">SMTP Server Host</label>
+                            <input id="cfg-smtp-host" type="text" placeholder="smtp.gmail.com or mail.example.com" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">SMTP Port</label>
+                            <input id="cfg-smtp-port" type="number" placeholder="587" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">SMTP Username / Email</label>
+                            <input id="cfg-smtp-user" type="text" placeholder="sender@example.com" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">SMTP Password / App Password</label>
+                            <input id="cfg-smtp-pass" type="password" placeholder="••••••••" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">From Email Address</label>
+                            <input id="cfg-smtp-from" type="email" placeholder="sender@example.com" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                        </div>
+                    </div>
+
+                    <div class="pt-2 flex items-center justify-between">
+                        <button id="btn-test-smtp" type="button" class="px-3.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-violet-300 text-xs font-mono flex items-center gap-1.5 transition-all">
+                            <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Test SMTP Connection
+                        </button>
+                        <button type="submit" class="px-5 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs flex items-center gap-1.5 transition-all shadow-lg shadow-cyan-500/20">
+                            <i data-lucide="save" class="w-4 h-4"></i> Save Settings
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </section>
+
+    </main>
+
+    <!-- Modal: Add Website Repository -->
+    <div id="add-source-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+        <div class="glass-panel w-full max-w-lg rounded-2xl p-6 border border-white/10 shadow-2xl relative">
+            <div class="flex items-center justify-between pb-4 border-b border-zinc-800">
+                <h3 class="text-base font-bold text-white flex items-center gap-2">
+                    <i data-lucide="globe" class="w-4 h-4 text-cyan-400"></i> Add Website Repository
+                </h3>
+                <button id="btn-close-source-modal" class="text-zinc-500 hover:text-white">&times;</button>
+            </div>
+
+            <div class="mt-4 space-y-4">
+                <div>
+                    <label class="text-[11px] font-mono text-zinc-400 block mb-1">Website URL or Blog Index</label>
+                    <div class="flex gap-2">
+                        <input id="source-url-input" type="url" placeholder="https://blog.cloudflare.com" class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                        <button id="probe-btn" class="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-cyan-400 font-mono text-xs font-medium whitespace-nowrap">
+                            Inspect Site
+                        </button>
+                    </div>
+                    <span class="text-[10px] text-zinc-500 mt-1 block">AetherPub auto-detects RSS, Atom feeds, and Sitemaps.</span>
+                </div>
+
+                <!-- Preview Box -->
+                <div id="source-preview-box" class="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3 hidden">
+                    <div class="flex items-center justify-between">
+                        <h4 id="preview-site-name" class="font-semibold text-sm text-white"></h4>
+                        <span id="preview-mode" class="px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 text-[10px] font-mono"></span>
+                    </div>
+                    <div class="text-xs text-zinc-400 font-mono truncate" id="preview-feed-url"></div>
+
+                    <div>
+                        <span class="text-[11px] font-mono text-zinc-500 block mb-1">Recent Articles Discovered:</span>
+                        <ul id="preview-articles-list" class="space-y-1"></ul>
+                    </div>
+
+                    <button id="confirm-add-source-btn" class="w-full py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-cyan-500/20">
+                        <i data-lucide="check" class="w-4 h-4"></i> Confirm & Start Ingesting
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: In-Browser Reader -->
+    <div id="reader-modal" class="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex flex-col hidden">
+        <div class="h-14 px-6 border-b border-zinc-800 flex items-center justify-between bg-zinc-950">
+            <div class="flex items-center gap-3">
+                <i data-lucide="book-open" class="w-5 h-5 text-violet-400"></i>
+                <h3 id="reader-title" class="text-sm font-bold text-white font-mono"></h3>
+            </div>
+            <button id="btn-close-reader" class="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-mono">
+                ✕ Close Reader
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-4 py-8">
+            <div id="reader-content-box" class="max-w-3xl mx-auto"></div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm pointer-events-none"></div>
+
+    <!-- App Script -->
+    <script src="/static/js/app.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>

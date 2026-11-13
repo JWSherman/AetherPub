@@ -1,0 +1,118 @@
+/* Custom Cyberpunk Dark Styling for AetherPub */
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700;800&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&display=swap');
+
+:root {
+    --bg-main: #09090b;
+    --card-bg: rgba(18, 18, 24, 0.75);
+    --card-border: rgba(255, 255, 255, 0.08);
+    --neon-cyan: #06b6d4;
+    --neon-violet: #8b5cf6;
+    --neon-amber: #f59e0b;
+    --neon-emerald: #10b981;
+}
+
+body {
+    background-color: var(--bg-main);
+    color: #e2e8f0;
+    font-family: 'Inter', sans-serif;
+    overflow-x: hidden;
+}
+
+.font-mono {
+    font-family: 'Fira Code', monospace;
+}
+
+.font-serif {
+    font-family: 'Newsreader', serif;
+}
+
+/* Glassmorphism panels */
+.glass-panel {
+    background: var(--card-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--card-border);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glass-panel:hover {
+    border-color: rgba(6, 182, 212, 0.3);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6), 0 0 15px rgba(6, 182, 212, 0.1);
+}
+
+/* Glowing borders */
+.glow-cyan {
+    box-shadow: 0 0 20px rgba(6, 182, 212, 0.25);
+}
+
+.glow-violet {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.25);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #09090b;
+}
+::-webkit-scrollbar-thumb {
+    background: #27272a;
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #3f3f46;
+}
+
+/* Terminal Log animation */
+.terminal-cursor::after {
+    content: '▋';
+    color: var(--neon-cyan);
+    animation: blink 1s step-start infinite;
+}
+
+@keyframes blink {
+    50% { opacity: 0; }
+}
+
+/* Reader modal article formatting */
+.reader-body {
+    font-family: 'Newsreader', serif;
+    font-size: 1.15rem;
+    line-height: 1.8;
+    color: #f1f5f9;
+}
+.reader-body p {
+    margin-bottom: 1.25rem;
+    text-align: justify;
+}
+.reader-body h1, .reader-body h2, .reader-body h3 {
+    font-family: 'Inter', sans-serif;
+    color: #38bdf8;
+    margin-top: 1.75rem;
+    margin-bottom: 0.75rem;
+    font-weight: 600;
+}
+.reader-body img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin: 1.5rem auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.reader-body blockquote {
+    border-left: 3px solid #8b5cf6;
+    padding-left: 1rem;
+    margin: 1.25rem 0;
+    font-style: italic;
+    color: #cbd5e1;
+}
+.reader-body pre, .reader-body code {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.9em;
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 4px;
+    padding: 0.2rem 0.4rem;
+}

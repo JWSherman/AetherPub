@@ -1,0 +1,52 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution & Packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual Environments & Secrets
+.env
+.env.*
+!.env.example
+venv/
+.venv/
+env/
+ENV/
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local Storage, Databases & Generated E-Reader Digests
+storage/*.db
+storage/*.db-journal
+storage/*.db-wal
+storage/*.db-shm
+storage/*.sqlite
+storage/*.sqlite3
+storage/epubs/*
+!storage/epubs/.gitkeep
+storage/covers/*
+!storage/covers/.gitkeep
+storage/media/*
+!storage/media/.gitkeep
+
+# Logs
+*.log
+logs/
+
+# Operating System & IDE Files
+.DS_Store
+Thumbs.db
+[Dd]esktop.ini
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
