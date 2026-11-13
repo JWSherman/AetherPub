@@ -51,6 +51,13 @@ Open your browser to: **`http://127.0.0.1:8000`**
 
 ---
 
+## Architecture & Engineering Guide
+
+For deep technical details, subsystem specifications, extension recipes, and guidelines for AI agents, see:
+📄 [ARCHITECTURE.md](ARCHITECTURE.md)
+
+---
+
 ## Architecture Overview
 
 ```
