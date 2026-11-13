@@ -1,5 +1,7 @@
 import pytest
 import uuid
+import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 from sqlalchemy import select
 from backend.app.core.database import AsyncSessionLocal, init_db
@@ -29,6 +31,7 @@ async def test_full_compilation_pipeline():
             url=f"https://arstechnica-{test_id}.com/gadgets/2026/11/color-eink-review",
             title="The Future of Color E-Ink and Mobile Reading",
             author="Technology Editor",
+            published_at=datetime(2026, 11, 13, 11, 20, tzinfo=timezone.utc),
             clean_html="<p>Color E-ink displays have matured rapidly with Kaleido 3 and Gallery 3 panels providing vibrant illustrations for books and magazines.</p>",
             plain_text="Color E-ink displays have matured rapidly with Kaleido 3 and Gallery 3 panels providing vibrant illustrations for books and magazines.",
             excerpt="Color E-ink displays have matured rapidly...",
@@ -48,6 +51,13 @@ async def test_full_compilation_pipeline():
     assert "AetherPub Daily" in edition.title
     assert Path(edition.file_path).exists()
     assert edition.file_size_bytes > 0
+
+    with zipfile.ZipFile(edition.file_path, "r") as z:
+        ch_files = [f for f in z.namelist() if "chapter_" in f]
+        assert len(ch_files) > 0
+        ch1_text = z.read(ch_files[0]).decode("utf-8")
+        assert "Published:" in ch1_text
+        assert "2026-11-13 11:20" in ch1_text
 
     # In a fresh session, verify article is now marked bundled
     async with AsyncSessionLocal() as verify_session:

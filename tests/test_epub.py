@@ -22,6 +22,7 @@ def test_epub3_generation_and_zip_structure(tmp_path: Path):
             "id": "art_1",
             "title": "Deep Dive into Modern E-Ink Displays",
             "author": "Nikola Tesla",
+            "published_at": "2026-11-13 14:30:00",
             "url": "https://example.com/eink",
             "source_name": "Display Tech Review",
             "word_count": 450,
@@ -78,6 +79,13 @@ def test_epub3_generation_and_zip_structure(tmp_path: Path):
         # Chapters
         assert any("chapter_1.xhtml" in name for name in namelist)
         assert any("chapter_2.xhtml" in name for name in namelist)
+        ch1_name = next(name for name in namelist if "chapter_1.xhtml" in name)
+        ch1_content = z.read(ch1_name).decode("utf-8")
+        assert 'href="nav.xhtml"' in ch1_content
+        assert "Table of Contents" in ch1_content
+        assert "Read original article" not in ch1_content
+        assert "Published:" in ch1_content
+        assert "2026-11-13 14:30" in ch1_content
 
         # Stylesheet
         assert any("eink.css" in name for name in namelist)

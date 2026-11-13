@@ -529,6 +529,7 @@ function renderArticles() {
                     ${art.excerpt ? `<p class="text-xs text-zinc-400 mt-1 line-clamp-2">${art.excerpt}</p>` : ''}
 
                     <div class="mt-3 flex items-center gap-4 text-[11px] text-zinc-500 font-mono">
+                        ${(art.published_at || art.created_at) ? `<span>${new Date(art.published_at || art.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>` : ''}
                         <span>~${Math.max(1, Math.round(art.word_count / 220))} min read</span>
                         <span>${art.word_count} words</span>
                         ${art.author ? `<span>Author: ${art.author}</span>` : ''}
@@ -870,6 +871,7 @@ async function readEditionInBrowser(editionId) {
                 <h2 class="text-2xl font-bold text-white mt-1">${art.title}</h2>
                 <div class="mt-2 text-xs text-zinc-400 font-mono flex items-center gap-4">
                     ${art.author ? `<span>By ${art.author}</span>` : ''}
+                    ${art.published_at ? `<span>${new Date(art.published_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>` : ''}
                     <span>${art.word_count} words</span>
                     <a href="${art.url}" target="_blank" class="text-cyan-400 hover:underline">Original Source &rarr;</a>
                 </div>

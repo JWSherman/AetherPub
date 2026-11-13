@@ -139,7 +139,8 @@ class DiscoveryService:
                     if link:
                         candidates.append({
                             "url": urljoin(target_feed, link),
-                            "title": title
+                            "title": title,
+                            "published": entry.get("published") or entry.get("updated")
                         })
                 if candidates:
                     return candidates

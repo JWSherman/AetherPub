@@ -1,4 +1,5 @@
 import asyncio
+import re
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -82,11 +83,34 @@ async def ingest_source(source_id: str):
                         # Excluded by keyword
                         continue
 
+                    pub_dt = None
+                    raw_pub = extracted.get("published_at") or item.get("published")
+                    if raw_pub:
+                        if isinstance(raw_pub, datetime):
+                            pub_dt = raw_pub
+                        elif isinstance(raw_pub, str) and raw_pub.strip():
+                            try:
+                                from dateutil import parser
+                                pub_dt = parser.parse(raw_pub)
+                            except Exception:
+                                pub_dt = None
+                    if not pub_dt:
+                        url_match = re.search(r'/(\d{4})/(\d{2})/(\d{2})/', url)
+                        if url_match:
+                            try:
+                                year, month, day = map(int, url_match.groups())
+                                pub_dt = datetime(year, month, day, 12, 0, tzinfo=timezone.utc)
+                            except Exception:
+                                pub_dt = None
+                    if not pub_dt:
+                        pub_dt = datetime.now(timezone.utc)
+
                     new_article = Article(
                         source_id=source.id,
                         url=url,
                         title=extracted["title"],
                         author=extracted["author"],
+                        published_at=pub_dt,
                         clean_html=extracted["clean_html"],
                         plain_text=extracted["plain_text"],
                         excerpt=extracted["excerpt"],
@@ -179,7 +203,8 @@ async def compile_daily_edition(limit: int | None = None) -> DailyEdition | None
                     "source_name": src_name,
                     "word_count": art.word_count,
                     "clean_html": clean_html,
-                    "images": images
+                    "images": images,
+                    "published_at": art.published_at or art.created_at
                 })
         finally:
             await client.aclose()

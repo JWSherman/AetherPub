@@ -43,6 +43,7 @@ async def get_edition_details(edition_id: str, db: AsyncSession = Depends(get_db
             "title": art.title,
             "author": art.author,
             "url": art.url,
+            "published_at": art.published_at.isoformat() if art.published_at else None,
             "word_count": art.word_count,
             "excerpt": art.excerpt
         })

@@ -30,6 +30,8 @@ async def list_articles(
     for art, s_name in result.all():
         resp = ArticleResponse.model_validate(art)
         resp.source_name = s_name
+        if not resp.published_at:
+            resp.published_at = art.created_at
         items.append(resp)
     return items
 
@@ -44,7 +46,7 @@ async def get_article_detail(article_id: str, db: AsyncSession = Depends(get_db)
         "title": art.title,
         "author": art.author,
         "url": art.url,
-        "published_at": art.published_at,
+        "published_at": art.published_at or art.created_at,
         "clean_html": art.clean_html,
         "excerpt": art.excerpt,
         "word_count": art.word_count,

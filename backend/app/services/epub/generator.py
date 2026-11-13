@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, date
 from pathlib import Path
 from ebooklib import epub
 from backend.app.core.config import settings
@@ -61,12 +62,28 @@ class EPUBGenerator:
             reading_time = max(1, art.get("word_count", 0) // 220)
             source_line = f"<strong>Source:</strong> {art.get('source_name', 'Web')}<br />"
 
+            pub_val = art.get("published_at") or art.get("created_at") or datetime.now()
+            formatted_pub = None
+            if isinstance(pub_val, datetime):
+                formatted_pub = pub_val.strftime("%Y-%m-%d %H:%M")
+            elif isinstance(pub_val, date):
+                formatted_pub = pub_val.strftime("%Y-%m-%d")
+            elif isinstance(pub_val, str) and pub_val.strip():
+                try:
+                    from dateutil import parser
+                    parsed_dt = parser.parse(pub_val)
+                    formatted_pub = parsed_dt.strftime("%Y-%m-%d %H:%M")
+                except Exception:
+                    formatted_pub = pub_val.strip()
+            published_line = f"<strong>Published:</strong> {formatted_pub}<br />" if formatted_pub else ""
+
             meta_html = f"""
             <div class="article-meta">
                 {source_line}
                 {author_line}
+                {published_line}
                 <strong>Reading Time:</strong> ~{reading_time} min ({art.get('word_count', 0)} words)<br />
-                <a href="{art['url']}">Read original article &rarr;</a>
+                <a href="nav.xhtml">&larr; Table of Contents</a>
             </div>
             """
 
