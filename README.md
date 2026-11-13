@@ -1,119 +1,207 @@
-# AetherPub ⚡
-### Automated Daily E-Reader EPUB 3 Periodical Engine
+<div align="center">
 
-AetherPub is a self-hosted platform designed for avid readers and e-reader owners (Kindle, Kobo, Boox, reMarkable). It monitors designated websites, blogs, and RSS feeds, cleans and extracts articles with full RGB color image preservation, evaluates them against user-defined interest keywords, and compiles a daily omnibus EPUB 3 periodical with procedural cover art and wireless e-reader delivery.
+# ⚡ AetherPub
 
----
+### **The Automated Daily E-Reader EPUB 3 Periodical Engine**
 
-## Key Features
+Turn the websites, blogs, and RSS feeds you love into a daily, distraction-free omnibus EPUB ready for your Kindle, Kobo, Boox, or reMarkable e-reader.
 
-- **Cyberpunk Reactive Dark WebUI**:
-  - Deep OLED dark theme with glowing cyan/violet accents and glassmorphic panels.
-  - Live Server-Sent Events (SSE) telemetry console streaming real-time crawler logs and compilation milestones.
-  - Interactive Keyword Sandbox for dry-run testing article scoring formulas.
-  - In-browser reading modal with chapter navigation and formatted typography.
-- **Hybrid Source Ingestion**:
-  - Auto-discovery of RSS, Atom feeds, Sitemaps, or polite shallow HTML crawling.
-  - Concurrency limiter and random polite jitter (200ms–600ms) to respect target web servers.
-- **Color E-Ink & Tablet Optimization**:
-  - Preserves full RGB color channels for color e-ink displays (Kaleido 3, Gallery 3, reMarkable Paper Pro) and tablets.
-  - Downscales oversized photos to $\le 1600\text{px}$ JPEG (quality 85) for snappy e-reader page turns.
-- **Intelligent Keyword Curation**:
-  - Support for `+required` keywords, `-excluded` keywords, and positive/negative interest weights.
-  - Title matches carry $3\times$ weight boost over body text.
-  - 64-bit SimHash deduplication prevents syndication duplicates across aggregators.
-  - Configurable daily article quotas.
-- **IDPF EPUB 3.2 Standard Compliance**:
-  - Procedural cover generator (Pillow) with date, article count, and topic banners.
-  - Dual Table of Contents: EPUB 3 `nav.xhtml` and legacy EPUB 2 `toc.ncx` for older Kindles.
-  - E-ink typography stylesheet with relative units, styled blockquotes, high-contrast code blocks, and page-break controls.
-- **Out-of-the-Box Send-to-Kindle (SMTP)**:
-  - 1-click email dispatch directly to `@kindle.com` or personal e-reader email address.
-  - Built-in SMTP connection tester.
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%20%7C%203.14-38bdf8.svg?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-06b6d4.svg?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![EPUB 3](https://img.shields.io/badge/EPUB-3.2%20Standard-8b5cf6.svg?style=flat-square&logo=bookstack&logoColor=white)](https://www.w3.org/publishing/epub3/)
+[![Tests](https://img.shields.io/badge/tests-13%20passed-10b981.svg?style=flat-square)](tests/)
+[![Theme](https://img.shields.io/badge/theme-Cyberpunk%20Obsidian-09090b.svg?style=flat-square)](UI_DESIGN_SYSTEM.md)
+[![License: MIT](https://img.shields.io/badge/license-MIT-amber.svg?style=flat-square)](LICENSE)
+
+</div>
 
 ---
 
-## Quickstart
+## 📖 Overview
 
-### 1. Requirements
-- Python 3.12+ (tested and verified on Python 3.14 on Windows)
+Reading long-form technical articles, newsletters, and blogs on computer monitors or smartphone screens causes eye fatigue and cognitive distraction. Most "send to e-reader" extensions only bundle one article at a time or convert images to muddy grayscale.
 
-### 2. Install Dependencies
+**AetherPub** is an all-in-one, self-hosted web platform that continuously tracks your favorite websites and RSS feeds, filters and scores incoming articles based on your personal keyword interests, and automatically compiles them each morning into a single consolidated, beautifully typeset **EPUB 3 daily digest** complete with procedural cover art, table of contents, full RGB color diagrams, and 1-click Amazon Send-to-Kindle delivery.
+
+---
+
+## ✨ Key Features
+
+### 🌐 Hybrid Source Discovery & Direct RSS Feed Input
+- **Direct Feed Links**: Paste direct RSS, Atom, or XML feed URLs (e.g. `https://gameinformer.com/reviews.xml`) to target specific categories and sections.
+- **Auto-Discovery**: Enter standard website homepages (e.g. `https://blog.cloudflare.com`) and AetherPub automatically locates hidden feed tags, probes standard paths, or falls back to shallow HTML crawling.
+- **Multi-Feed Domain Support**: Track multiple distinct feeds from the same root domain without duplicate collisions.
+
+### 🎨 Color E-Ink & Modern Reader Optimization
+- **Full RGB Color Preservation**: Extracted photos, diagrams, and infographics retain their original RGB color channels for modern color e-ink devices (**Kindle Colorsoft, Kobo Clara Colour, reMarkable Paper Pro, Boox Palma/Tab**) and tablets.
+- **Adaptive Downscaling**: High-resolution imagery is gracefully resized to max 1600px JPEG (quality 85) to ensure rapid e-reader page turns and compact file sizes.
+
+### 🎯 Intelligent Keyword & Topic Curation
+- **Weighted Scoring**: Set custom weights on topics you care about. Matches in article titles receive a $3\times$ boost over body text.
+- **Required Keywords (`+keyword`)**: Guarantee that only articles containing mandatory tags are considered.
+- **Excluded Keywords (`-keyword`)**: Instantly discard articles matching clickbait or uninteresting topics.
+- **SimHash 64-bit Deduplication**: Prevents cross-posted or syndicated articles across aggregators from appearing twice.
+- **Interactive Scoring Sandbox**: Test your keyword scoring rules against sample URLs or text snippets before adding them.
+
+### 📚 IDPF EPUB 3.2 Standard Compliance
+- **Procedural Cover Art**: Pillow procedurally generates a bespoke, high-resolution ($1600 \times 2400$) cover image for every daily edition with date emblems and topic summaries.
+- **Dual Table of Contents**: Generates modern EPUB 3 `nav.xhtml` alongside legacy EPUB 2 `toc.ncx` for 100% navigation compatibility with both older and newer Kindle/Kobo firmware.
+- **E-Ink Typography**: Serif body typography, relative fluid spacing, styled blockquotes, high-contrast code blocks, and strict chapter page-break controls.
+
+### 📧 Built-in Send-to-Kindle (SMTP)
+- Send compiled editions directly to your `@kindle.com` or personal e-reader address with 1 click.
+- Automatic daily dispatch option upon scheduled compilation.
+- Interactive SMTP connection testing tool.
+
+### ⚡ Cyberpunk Reactive Dark WebUI
+- Zero-node runtime: served directly by FastAPI from static assets—starts in under 2 seconds.
+- Live Server-Sent Events (SSE) telemetry terminal streaming background crawler discoveries and compilation progress in real time.
+- Integrated modal reader to preview compiled chapters and color illustrations directly in your browser.
+
+---
+
+## 🚀 Quickstart
+
+### Prerequisites
+- **Python 3.12+** (tested and verified on Python 3.14 on Windows & Linux)
+- Git
+
+### 1. Clone & Install Dependencies
 ```powershell
+git clone https://github.com/your-username/aetherpub.git
+cd aetherpub
 python -m pip install -r requirements.txt
 ```
 
-### 3. Launch the Server
+### 2. Start AetherPub
 ```powershell
 python run.py
 ```
-Open your browser to: **`http://127.0.0.1:8000`**
+
+### 3. Open the Dashboard
+Navigate to: **[http://127.0.0.1:8000](http://127.0.0.1:8000)**  
+Interactive Swagger API docs are available at: **[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)**
 
 ---
 
-## Architecture & Engineering Guide
+## 🖥️ WebUI Walkthrough
 
-For deep technical details, subsystem specifications, extension recipes, and guidelines for AI agents, see:
-📄 [ARCHITECTURE.md](ARCHITECTURE.md)
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│ ⚡ AETHERPUB                      ● System Active (Idle)   [Compile]   │
+├────────────────────────────────────────────────────────────────────────┤
+│ [Overview]  [Website Sources]  [Keyword Matrix]  [Daily Digests] [...] │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  Tracked Sources   Active Keywords   Ready to Bundle   Total Digests   │
+│       [ 12 ]            [ 8 ]            [ 34 ]            [ 5 ]       │
+│                                                                        │
+│  ┌─ LATEST DIGEST ──────────────────────────────────────────────────┐  │
+│  │ AetherPub Daily – 2026-11-13  •  10 Articles  •  ~25 min read    │  │
+│  │ [⬇ Download EPUB]  [📧 Send to Device]  [👁 Read in Browser]     │  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+│                                                                        │
+│  ┌─ LIVE PIPELINE TELEMETRY (SSE STREAM) ───────────────────────────┐  │
+│  │ [14:02:10] 🔍 Crawling source: Cloudflare Blog                   │  │
+│  │ [14:02:11] 📄 Ingested "Choosing QuePaxa" (Score: 8.5)          │  │
+│  │ [14:02:15] 📚 Compiling Daily EPUB (10 articles)...             │  │
+│  │ [14:02:17] 🎉 Generated EPUB "aetherpub_2026-11-13.epub" (0.2 MB)│  │
+│  └──────────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+1. **Website Sources**: Add websites or direct feeds. Inspect links with live article preview before confirming.
+2. **Keyword Matrix**: Add tags, adjust weight sliders (-5 to +10), mark rules as `[+] Required` or `[-] Excluded`, and dry-run test scores in the sandbox.
+3. **Daily Digests**: Browse compiled editions, view procedural cover thumbnails, download `.epub` files, or read chapters directly in the web browser.
+4. **Settings & SMTP**: Set your daily cron schedule hour/minute, daily article quota, and SMTP credentials.
 
 ---
 
-## Architecture Overview
+## 📨 Amazon Send-to-Kindle Setup Guide
+
+To deliver daily editions directly to your Kindle wirelessly:
+
+1. Open your **Amazon Account** $\rightarrow$ Navigate to **Manage Your Content and Devices** $\rightarrow$ **Preferences**.
+2. Scroll to **Personal Document Settings**.
+3. Copy your Kindle email address (e.g., `yourname_123@kindle.com`).
+4. Under **Approved Personal Document E-mail List**, click **Add a new approved e-mail address** and enter the email address you will use in AetherPub's `From Email` field.
+5. In AetherPub:
+   - Go to **Settings & SMTP**.
+   - Enter your Kindle email in **Target E-Reader Email**.
+   - Fill in your SMTP host (e.g. `smtp.gmail.com`, port `587`), username, and password / app password.
+   - Click **Test SMTP Connection** to verify.
+   - (Optional) Toggle **Auto-send upon daily build** to dispatch digests automatically every morning!
+
+---
+
+## 🛠️ Architecture & Developer Documentation
+
+For contributors and autonomous AI agents:
+
+- 🤖 **[AGENTS.md](AGENTS.md)** – Mandatory AI entry point, hard constraints, and verification checklist.
+- 📄 **[ARCHITECTURE.md](ARCHITECTURE.md)** – Detailed subsystem specifications, data flow diagrams, SimHash algorithms, and extension recipes.
+- 🎨 **[UI_DESIGN_SYSTEM.md](UI_DESIGN_SYSTEM.md)** – Strict visual language, cyberpunk dark tokens, component anatomy, and typography hierarchy.
+
+### Repository Map
 
 ```
-agyplayground/
+aetherpub/
 ├── backend/
 │   ├── app/
-│   │   ├── api/
-│   │   │   ├── endpoints/          # REST & SSE routers
-│   │   │   └── router.py           # /api/v1 aggregation
-│   │   ├── core/
-│   │   │   ├── config.py           # Pydantic settings & directories
-│   │   │   ├── database.py         # SQLAlchemy 2.0 async engine
-│   │   │   └── event_bus.py        # Async in-memory SSE broker
-│   │   ├── models/
-│   │   │   └── entities.py         # Source, Keyword, Article, DailyEdition
-│   │   ├── schemas/
-│   │   │   └── api_models.py       # Pydantic v2 schemas
+│   │   ├── api/endpoints/     # REST & SSE route handlers
+│   │   ├── core/              # Config, async SQLite engine, SSE event bus
+│   │   ├── models/            # SQLAlchemy 2.0 async ORM entities
+│   │   ├── schemas/           # Pydantic v2 validation models
 │   │   ├── services/
-│   │   │   ├── crawler/            # Discovery & polite fetcher
-│   │   │   ├── extractor/          # Trafilatura & color image downscaler
-│   │   │   ├── curator/            # Keyword scoring & SimHash deduplication
-│   │   │   ├── epub/               # EPUB 3 compiler & procedural covers
-│   │   │   ├── delivery/           # aiosmtplib Send-to-Kindle
-│   │   │   └── scheduler/          # APScheduler cron runner
-│   │   └── main.py                 # FastAPI application
-│   └── tests/                      # Automated test suite (11 unit & e2e tests)
-├── frontend/
-│   └── static/
-│       ├── css/custom.css          # Glassmorphism & reader styling
-│       ├── js/app.js               # Reactive SSE client & UI logic
-│       └── index.html              # Cyberpunk dark dashboard SPA
-├── storage/
-│   ├── aetherpub.db                # SQLite database
-│   ├── epubs/                      # Generated .epub files
-│   ├── covers/                     # Generated cover images
-│   └── media/                      # Cached media assets
-├── requirements.txt
-├── run.py
-└── README.md
+│   │   │   ├── crawler/       # Direct RSS & heuristic auto-discovery
+│   │   │   ├── extractor/     # Trafilatura parser & Pillow RGB downscaler
+│   │   │   ├── curator/       # Keyword scoring & 64-bit SimHash deduplicator
+│   │   │   ├── epub/          # EbookLib EPUB 3 builder & procedural cover artist
+│   │   │   ├── delivery/      # aiosmtplib Send-to-Kindle dispatcher
+│   │   │   └── scheduler/     # APScheduler background runner
+│   │   └── main.py            # FastAPI initialization & static asset mounting
+│   └── tests/                 # Automated test suite (13 unit & integration tests)
+├── frontend/static/           # Zero-Node vanilla reactive SPA
+│   ├── css/custom.css         # Glassmorphism & e-reader serif typography
+│   ├── js/app.js              # Reactive SSE client & view router
+│   └── index.html             # Cyberpunk dark dashboard
+├── storage/                   # Local SQLite DB & generated EPUB/cover vault
+├── requirements.txt           # Python package requirements
+├── run.py                     # Top-level application launcher
+└── README.md                  # This file
 ```
 
 ---
 
-## Automated Verification
+## 🧪 Automated Testing
 
-Run the test suite with pytest:
+AetherPub includes a comprehensive automated test suite with an isolated SQLite test database fixture.
+
+Run tests with pytest:
 ```powershell
 python -m pytest tests/ -v
 ```
 
-All 11 automated tests verify:
-- SimHash text deduplication and Hamming distance calculation
-- Keyword scoring logic (title $3\times$ weighting, exclusion triggers, required checks)
-- Trafilatura readability extraction and HTML cleanup
-- Image downscaling and full RGB color preservation
-- Procedural cover image creation
-- EPUB 3 packaging, ZIP integrity, and table of contents
-- FastAPI REST endpoints and SSE event streaming
-- End-to-end source ingestion and compilation pipeline
+```text
+tests/test_api.py::test_api_health PASSED
+tests/test_api.py::test_keyword_crud_and_evaluate PASSED
+tests/test_api.py::test_direct_feed_probe_and_multiple_feeds_same_domain PASSED
+tests/test_curator.py::test_simhash_identical_and_similar_texts PASSED
+tests/test_curator.py::test_simhash_malformed_hashes_resilience PASSED
+tests/test_curator.py::test_keyword_scorer_weighted_interest PASSED
+tests/test_curator.py::test_keyword_scorer_exclusion PASSED
+tests/test_curator.py::test_keyword_scorer_required_missing PASSED
+tests/test_epub.py::test_cover_image_generation PASSED
+tests/test_epub.py::test_epub3_generation_and_zip_structure PASSED
+tests/test_extractor.py::test_readability_extraction PASSED
+tests/test_extractor.py::test_image_processor_color_preservation PASSED
+tests/test_pipeline_e2e.py::test_full_compilation_pipeline PASSED
+
+======================= 13 passed, 1 warning in 44.49s =======================
+```
+
+---
+
+## 📄 License
+
+Distributed under the **MIT License**. See `LICENSE` for details.

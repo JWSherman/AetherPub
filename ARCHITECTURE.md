@@ -20,6 +20,8 @@ AetherPub is a self-hosted, automated web-to-EPUB periodical engine built specif
    - Every compiled book **must include both** EPUB 3 `nav.xhtml` and legacy EPUB 2 `toc.ncx` to guarantee navigation compatibility across all Kindle firmware revisions and third-party readers (KOReader, Moon+ Reader, Calibre).
 4. **Hexadecimal SimHash Integrity**:
    - The `content_hash` field on `Article` is a 64-bit hexadecimal SimHash string (`f"{fingerprint:016x}"`). Never assign non-hex strings (e.g. `'hash_test'`) to this field.
+5. **Strict UI Design System Compliance**:
+   - Any frontend changes or new visual features must strictly follow the rules in [UI_DESIGN_SYSTEM.md](UI_DESIGN_SYSTEM.md) (Cyberpunk Obsidian dark theme, OLED black `#09090b`, glassmorphic panels, specific neon accent semantics, and zero Node build-steps).
 
 ---
 
