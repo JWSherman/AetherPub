@@ -639,30 +639,43 @@ async function probeSourceUrl() {
         const previewBox = document.getElementById('source-preview-box');
         previewBox.classList.remove('hidden');
 
-        document.getElementById('preview-site-name').textContent = data.name;
-        document.getElementById('preview-feed-url').textContent = data.feed_url || 'No RSS feed found (Shallow HTML crawl mode)';
-        document.getElementById('preview-mode').textContent = data.crawl_mode.toUpperCase();
+        const nameInput = document.getElementById('preview-site-name-input');
+        if (nameInput) nameInput.value = data.name;
+
+        const feedInput = document.getElementById('preview-feed-url-input');
+        if (feedInput) feedInput.value = data.feed_url || data.base_url;
+
+        const modeBadge = document.getElementById('preview-mode');
+        if (modeBadge) modeBadge.textContent = (data.crawl_mode === 'rss' ? 'RSS / XML Feed' : 'HTML Crawl');
 
         const previewList = document.getElementById('preview-articles-list');
-        previewList.innerHTML = (data.preview || []).map(p => `
-            <li class="truncate text-xs text-zinc-300">• ${p.title}</li>
-        `).join('');
+        previewList.innerHTML = (data.preview && data.preview.length > 0) ? data.preview.map(p => `
+            <li class="truncate text-xs text-zinc-300 py-0.5">• ${p.title}</li>
+        `).join('') : '<li class="text-xs text-zinc-500 italic">No article preview available</li>';
 
-        document.getElementById('confirm-add-source-btn').onclick = () => submitAddSource(url);
+        document.getElementById('confirm-add-source-btn').onclick = () => {
+            const customName = nameInput ? nameInput.value.trim() : data.name;
+            const targetFeed = data.feed_url || null;
+            submitAddSource(url, customName, targetFeed);
+        };
     } catch (e) {
         showToast(e.message, 'error');
     } finally {
         probeBtn.disabled = false;
-        probeBtn.textContent = 'Inspect Site';
+        probeBtn.textContent = 'Inspect Link';
     }
 }
 
-async function submitAddSource(url) {
+async function submitAddSource(url, name, feedUrl) {
     try {
+        const payload = { url };
+        if (name) payload.name = name;
+        if (feedUrl) payload.feed_url = feedUrl;
+
         const res = await fetch(`${API_BASE}/sources`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url })
+            body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Failed to add source');

@@ -53,16 +53,25 @@ async def add_source(payload: SourceCreate, bg: BackgroundTasks, db: AsyncSessio
     finally:
         await client.aclose()
 
-    # Check for existing
-    exist_check = await db.execute(select(Source).where(Source.base_url == probe_data["base_url"]))
+    final_name = (payload.name.strip() if payload.name else None) or probe_data.get("name") or payload.url
+    final_base_url = probe_data.get("base_url") or payload.url
+    final_feed_url = payload.feed_url or probe_data.get("feed_url")
+    final_crawl_mode = probe_data.get("crawl_mode", "auto")
+
+    # Check for existing source
+    if final_feed_url:
+        exist_check = await db.execute(select(Source).where(Source.feed_url == final_feed_url))
+    else:
+        exist_check = await db.execute(select(Source).where(Source.base_url == final_base_url))
+
     if exist_check.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="A source with this base URL is already registered.")
+        raise HTTPException(status_code=409, detail="This source or feed is already registered.")
 
     source = Source(
-        name=probe_data["name"] or payload.url,
-        base_url=probe_data["base_url"],
-        feed_url=probe_data["feed_url"],
-        crawl_mode=probe_data["crawl_mode"],
+        name=final_name,
+        base_url=final_base_url,
+        feed_url=final_feed_url,
+        crawl_mode=final_crawl_mode,
         is_active=True,
         last_status="idle"
     )

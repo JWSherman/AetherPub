@@ -3,6 +3,8 @@ from datetime import datetime
 
 class SourceCreate(BaseModel):
     url: str
+    name: str | None = None
+    feed_url: str | None = None
 
 class SourceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)

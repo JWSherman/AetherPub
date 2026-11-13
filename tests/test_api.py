@@ -51,3 +51,44 @@ async def test_keyword_crud_and_evaluate():
         del_resp = await ac.delete(f"/api/v1/keywords/{kw_id}")
         assert del_resp.status_code == 200
         assert del_resp.json()["status"] == "deleted"
+
+@pytest.mark.asyncio
+async def test_direct_feed_probe_and_multiple_feeds_same_domain():
+    await init_db()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # Mock probe with a mock RSS XML URL
+        sample_rss_url = "https://gameinformer.com/reviews.xml"
+        probe_resp = await ac.post("/api/v1/sources/probe", json={"url": sample_rss_url})
+        assert probe_resp.status_code == 200
+        data = probe_resp.json()
+        assert data["crawl_mode"] == "rss"
+        assert "gameinformer.com/reviews.xml" in data["feed_url"]
+        assert len(data["preview"]) > 0
+
+        # Add Source 1 (Reviews feed)
+        add_resp1 = await ac.post("/api/v1/sources", json={
+            "url": sample_rss_url,
+            "name": "Game Informer Reviews",
+            "feed_url": sample_rss_url
+        })
+        assert add_resp1.status_code == 200
+        src1 = add_resp1.json()
+        assert src1["name"] == "Game Informer Reviews"
+        assert src1["feed_url"] == sample_rss_url
+
+        # Add Source 2 from same domain (News feed)
+        sample_news_url = "https://gameinformer.com/news.xml"
+        add_resp2 = await ac.post("/api/v1/sources", json={
+            "url": sample_news_url,
+            "name": "Game Informer News",
+            "feed_url": sample_news_url
+        })
+        # Should NOT fail with 409 because the feed_url is distinct
+        assert add_resp2.status_code == 200
+        src2 = add_resp2.json()
+        assert src2["name"] == "Game Informer News"
+
+        # Cleanup
+        await ac.delete(f"/api/v1/sources/{src1['id']}")
+        await ac.delete(f"/api/v1/sources/{src2['id']}")

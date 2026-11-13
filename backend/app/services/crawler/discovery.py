@@ -15,7 +15,8 @@ class DiscoveryService:
 
     async def probe_source(self, base_url: str) -> dict:
         """
-        Probes a website to discover title, RSS/Atom feeds, and latest articles for preview.
+        Probes a website or direct RSS/Atom XML feed to discover title,
+        feed URL, and latest articles for preview.
         """
         base_url = base_url.strip()
         if not base_url.startswith("http://") and not base_url.startswith("https://"):
@@ -24,13 +25,43 @@ class DiscoveryService:
         parsed = urlparse(base_url)
         origin = f"{parsed.scheme}://{parsed.netloc}"
 
-        # 1. Fetch homepage
+        # 1. Fetch content
         resp = await self.client.get(base_url, timeout=10.0)
-        html = resp.text
-        soup = BeautifulSoup(html, "html.parser")
+        resp_text = resp.text
+        content_type = resp.headers.get("content-type", "").lower()
+
+        # 2. Check if the input URL itself is ALREADY a valid RSS/Atom/XML feed
+        try:
+            parsed_direct = feedparser.parse(resp_text)
+            if len(parsed_direct.entries) > 0 or (parsed_direct.feed and parsed_direct.feed.get("title")):
+                feed_title = parsed_direct.feed.get("title") or parsed.netloc
+                # If feed metadata specifies a site link, use it; otherwise use origin
+                site_link = parsed_direct.feed.get("link") or origin
+                preview_articles = []
+                for entry in parsed_direct.entries[:5]:
+                    link = entry.get("link", "")
+                    title = entry.get("title", "Untitled")
+                    if link:
+                        preview_articles.append({
+                            "title": title,
+                            "url": urljoin(base_url, link)
+                        })
+
+                return {
+                    "name": feed_title.strip(),
+                    "base_url": site_link,
+                    "feed_url": base_url,
+                    "crawl_mode": "rss",
+                    "preview": preview_articles
+                }
+        except Exception:
+            pass
+
+        # 3. Otherwise, treat as HTML homepage and look for feeds
+        soup = BeautifulSoup(resp_text, "html.parser")
         site_name = soup.title.string.strip() if soup.title and soup.title.string else parsed.netloc
 
-        # 2. Check for <link rel="alternate"> feeds
+        # Check for <link rel="alternate"> feeds
         feed_url = None
         for link in soup.find_all("link", rel=lambda r: r and any("alternate" in rel_item for rel_item in (r if isinstance(r, list) else [r]))):
             t = link.get("type", "")
@@ -38,7 +69,7 @@ class DiscoveryService:
                 feed_url = urljoin(base_url, link.get("href", ""))
                 break
 
-        # 3. If no link tag, probe common paths
+        # If no link tag, probe common paths
         if not feed_url:
             for path in COMMON_FEED_PATHS:
                 candidate = urljoin(origin, path)
@@ -51,7 +82,7 @@ class DiscoveryService:
                 except Exception:
                     continue
 
-        # 4. Preview recent items
+        # Preview recent items
         preview_articles = []
         crawl_mode = "html"
 
@@ -64,7 +95,7 @@ class DiscoveryService:
                     link = entry.get("link", "")
                     title = entry.get("title", "Untitled")
                     if link:
-                        preview_articles.append({"title": title, "url": link})
+                        preview_articles.append({"title": title, "url": urljoin(feed_url, link)})
             except Exception:
                 pass
 
@@ -95,26 +126,42 @@ class DiscoveryService:
         """
         Fetches fresh candidate articles from either RSS feed or shallow HTML crawl.
         """
+        target_feed = source_feed_url or (source_base_url if source_base_url.endswith((".xml", ".rss", ".atom")) else None)
+        
         candidates = []
-        if source_feed_url:
+        if target_feed:
             try:
-                resp = await self.client.get(source_feed_url, timeout=12.0)
+                resp = await self.client.get(target_feed, timeout=12.0)
                 parsed = feedparser.parse(resp.text)
                 for entry in parsed.entries:
                     link = entry.get("link")
                     title = entry.get("title", "")
                     if link:
                         candidates.append({
-                            "url": link,
+                            "url": urljoin(target_feed, link),
                             "title": title
                         })
-                return candidates
+                if candidates:
+                    return candidates
             except Exception:
                 pass
 
         # Fallback shallow HTML crawl
         try:
             resp = await self.client.get(source_base_url, timeout=10.0)
+            # Before HTML link scraping, check if the response body is actually an XML feed
+            direct_check = feedparser.parse(resp.text)
+            if len(direct_check.entries) > 0:
+                for entry in direct_check.entries:
+                    link = entry.get("link")
+                    title = entry.get("title", "")
+                    if link:
+                        candidates.append({
+                            "url": urljoin(source_base_url, link),
+                            "title": title
+                        })
+                return candidates
+
             soup = BeautifulSoup(resp.text, "html.parser")
             parsed_base = urlparse(source_base_url)
             seen = set()

@@ -382,27 +382,34 @@
 
             <div class="mt-4 space-y-4">
                 <div>
-                    <label class="text-[11px] font-mono text-zinc-400 block mb-1">Website URL or Blog Index</label>
+                    <label class="text-[11px] font-mono text-zinc-400 block mb-1">Website URL or Direct RSS/XML Feed Link</label>
                     <div class="flex gap-2">
-                        <input id="source-url-input" type="url" placeholder="https://blog.cloudflare.com" class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                        <input id="source-url-input" type="url" placeholder="https://gameinformer.com/reviews.xml or https://blog.cloudflare.com" class="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
                         <button id="probe-btn" class="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-cyan-400 font-mono text-xs font-medium whitespace-nowrap">
-                            Inspect Site
+                            Inspect Link
                         </button>
                     </div>
-                    <span class="text-[10px] text-zinc-500 mt-1 block">AetherPub auto-detects RSS, Atom feeds, and Sitemaps.</span>
+                    <span class="text-[10px] text-zinc-500 mt-1 block">Paste homepages (auto-detects feeds) or direct RSS/Atom XML feed links.</span>
                 </div>
 
                 <!-- Preview Box -->
                 <div id="source-preview-box" class="p-4 rounded-xl bg-zinc-950 border border-zinc-800 space-y-3 hidden">
-                    <div class="flex items-center justify-between">
-                        <h4 id="preview-site-name" class="font-semibold text-sm text-white"></h4>
-                        <span id="preview-mode" class="px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 text-[10px] font-mono"></span>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-mono text-zinc-400 uppercase">Source Display Name</label>
+                        <input id="preview-site-name-input" type="text" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white font-medium focus:outline-none focus:border-cyan-500">
                     </div>
-                    <div class="text-xs text-zinc-400 font-mono truncate" id="preview-feed-url"></div>
+
+                    <div class="space-y-1">
+                        <div class="flex items-center justify-between">
+                            <label class="text-[10px] font-mono text-zinc-400 uppercase">Feed Target URL</label>
+                            <span id="preview-mode" class="px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 text-[10px] font-mono uppercase"></span>
+                        </div>
+                        <input id="preview-feed-url-input" type="text" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-300 font-mono focus:outline-none focus:border-cyan-500" readonly>
+                    </div>
 
                     <div>
-                        <span class="text-[11px] font-mono text-zinc-500 block mb-1">Recent Articles Discovered:</span>
-                        <ul id="preview-articles-list" class="space-y-1"></ul>
+                        <span class="text-[11px] font-mono text-zinc-500 block mb-1">Recent Articles Discovered in Feed:</span>
+                        <ul id="preview-articles-list" class="space-y-1 max-h-36 overflow-y-auto pr-1"></ul>
                     </div>
 
                     <button id="confirm-add-source-btn" class="w-full py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-cyan-500/20">
