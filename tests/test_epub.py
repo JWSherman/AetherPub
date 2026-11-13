@@ -84,3 +84,6 @@ def test_epub3_generation_and_zip_structure(tmp_path: Path):
 
         # Embedded Cover
         assert any("cover" in name.lower() for name in namelist)
+
+        # Embedded Article Images
+        assert any("art_art_1_0.jpg" in name for name in namelist)

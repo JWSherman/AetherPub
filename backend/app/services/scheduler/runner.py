@@ -82,19 +82,12 @@ async def ingest_source(source_id: str):
                         # Excluded by keyword
                         continue
 
-                    # Process color images
-                    clean_html, images = await image_processor.process_article_images(
-                        extracted["clean_html"],
-                        article_id=extracted["content_hash"][:12],
-                        base_url=url
-                    )
-
                     new_article = Article(
                         source_id=source.id,
                         url=url,
                         title=extracted["title"],
                         author=extracted["author"],
-                        clean_html=clean_html,
+                        clean_html=extracted["clean_html"],
                         plain_text=extracted["plain_text"],
                         excerpt=extracted["excerpt"],
                         word_count=extracted["word_count"],

@@ -1,6 +1,7 @@
 import trafilatura
 from bs4 import BeautifulSoup
 import re
+from urllib.parse import urljoin
 from backend.app.services.curator.simhash import compute_simhash
 
 class ReadabilityService:
@@ -29,6 +30,50 @@ class ReadabilityService:
 
         if xml_output:
             clean_soup = BeautifulSoup(xml_output, "xml")
+
+            # Remove unwanted tags
+            for bad in clean_soup.find_all(["comments", "script", "style", "iframe", "form", "button"]):
+                bad.decompose()
+
+            # Transform TEI XML elements into valid XHTML tags
+            for g in clean_soup.find_all("graphic"):
+                g.name = "img"
+                src = g.get("src") or g.get("url") or ""
+                if src:
+                    g["src"] = urljoin(url, src)
+                if "url" in g.attrs and g.attrs["url"] != g.attrs.get("src"):
+                    del g.attrs["url"]
+
+            for r in clean_soup.find_all("ref"):
+                r.name = "a"
+                target = r.get("target") or r.get("href") or ""
+                if target:
+                    r["href"] = urljoin(url, target)
+                if "target" in r.attrs:
+                    del r.attrs["target"]
+
+            for h in clean_soup.find_all("head"):
+                rend = h.get("rend", "")
+                if rend in ("h1", "h2", "h3", "h4", "h5", "h6"):
+                    h.name = rend
+                else:
+                    h.name = "h2"
+                if "rend" in h.attrs:
+                    del h.attrs["rend"]
+
+            for hi in clean_soup.find_all("hi"):
+                rend = hi.get("rend", "")
+                if rend == "bold":
+                    hi.name = "strong"
+                elif rend == "italic":
+                    hi.name = "em"
+                if "rend" in hi.attrs:
+                    del hi.attrs["rend"]
+
+            # Extract main article element or doc content
+            main_elem = clean_soup.find("main") or clean_soup.find("body") or clean_soup.find("doc")
+            if main_elem:
+                clean_soup = BeautifulSoup(main_elem.decode_contents(), "html.parser")
         else:
             # Fallback to BeautifulSoup heuristic extraction
             raw_soup = BeautifulSoup(raw_html, "html.parser")
@@ -43,6 +88,14 @@ class ReadabilityService:
             article_elem = raw_soup.find("article") or raw_soup.find("main") or raw_soup.find(id=re.compile(r"content|post|article", re.I)) or raw_soup.find(class_=re.compile(r"content|post|article", re.I)) or raw_soup.body
             if article_elem:
                 clean_soup = BeautifulSoup(str(article_elem), "html.parser")
+                for img in clean_soup.find_all("img"):
+                    src = img.get("src")
+                    if src:
+                        img["src"] = urljoin(url, src)
+                for a in clean_soup.find_all("a"):
+                    href = a.get("href")
+                    if href:
+                        a["href"] = urljoin(url, href)
 
         if not clean_soup:
             return None

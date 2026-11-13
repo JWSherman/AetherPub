@@ -62,3 +62,41 @@ async def test_image_processor_color_preservation():
         # Check pixel color preserves chromaticity
         r, g, b = out_img.getpixel((10, 10))
         assert r > 200 and b > 100  # vivid pinkish red preserved!
+
+def test_readability_transforms_tei_graphic_and_headings():
+    # Verify that extracted HTML contains <img>, <h1>, and <a> rather than <graphic>, <head>, <ref>
+    result = ReadabilityService.extract_article(SAMPLE_HTML, url="https://example.com/browsers")
+    assert result is not None
+    clean_html = result["clean_html"]
+    assert "<graphic" not in clean_html
+    assert "<img" in clean_html
+    assert "https://example.com/assets/diagram.png" in clean_html
+    assert "<head" not in clean_html
+    assert "<doc" not in clean_html
+    assert "<?xml" not in clean_html
+
+@pytest.mark.asyncio
+async def test_image_processor_handles_graphic_tags_and_caching():
+    test_img = Image.new("RGB", (100, 100), color=(0, 200, 255))
+    buf = io.BytesIO()
+    test_img.save(buf, format="JPEG")
+    raw_bytes = buf.getvalue()
+
+    transport = httpx.MockTransport(lambda req: httpx.Response(200, content=raw_bytes))
+    async with httpx.AsyncClient(transport=transport) as client:
+        processor = ImageProcessor(client)
+        # Test input with both <graphic> and <img>
+        input_html = '<p><graphic alt="Screenshot" src="https://example.com/shot.jpg" /></p>'
+        epub_html, manifest = await processor.process_article_images(input_html, article_id="gi_999", base_url="https://example.com")
+
+        assert len(manifest) == 1
+        assert "images/art_gi_999_0.jpg" in epub_html
+        assert "<graphic" not in epub_html
+        assert "<img" in epub_html
+        assert manifest[0]["file_name"] == "images/art_gi_999_0.jpg"
+
+        # Two-stage re-compilation test: ensure images are not decomposed on second pass
+        epub_html2, manifest2 = await processor.process_article_images(epub_html, article_id="gi_999", base_url="https://example.com")
+        assert len(manifest2) == 1
+        assert "images/art_gi_999_0.jpg" in epub_html2
+        assert "<img" in epub_html2

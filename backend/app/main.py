@@ -40,6 +40,10 @@ frontend_dir = settings.BASE_DIR / "frontend" / "static"
 if frontend_dir.exists():
     app.mount("/static", StaticFiles(directory=str(frontend_dir)), name="static")
 
+# Mount Media Vault
+if settings.MEDIA_DIR.exists():
+    app.mount("/media", StaticFiles(directory=str(settings.MEDIA_DIR)), name="media")
+
 @app.get("/", include_in_schema=False)
 async def serve_index():
     index_file = frontend_dir / "index.html"
