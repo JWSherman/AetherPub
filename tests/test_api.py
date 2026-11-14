@@ -189,3 +189,51 @@ async def test_editions_download_timestamps_and_delete(tmp_path):
         assert not cover_file.exists()
         missing_resp = await ac.get(f"/api/v1/editions/{edition_id}")
         assert missing_resp.status_code == 404
+
+@pytest.mark.asyncio
+async def test_reset_bundled_articles():
+    import uuid
+    from backend.app.core.database import AsyncSessionLocal
+    from backend.app.models.entities import Source, Article
+
+    await init_db()
+
+    async with AsyncSessionLocal() as session:
+        src = Source(
+            name="Test Reset Source",
+            base_url=f"https://example.com/{uuid.uuid4().hex[:8]}",
+            crawl_mode="rss"
+        )
+        session.add(src)
+        await session.flush()
+
+        art = Article(
+            source_id=src.id,
+            url=f"https://example.com/post-{uuid.uuid4().hex[:8]}",
+            title="Bundled Test Article",
+            clean_html="<div class='article-content'><p>Test body</p></div>",
+            plain_text="Test body",
+            word_count=100,
+            content_hash=uuid.uuid4().hex[:16],
+            relevance_score=5.0,
+            is_bundled=True
+        )
+        session.add(art)
+        await session.commit()
+        src_id = src.id
+        art_id = art.id
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        reset_resp = await ac.post("/api/v1/articles/reset-bundled")
+        assert reset_resp.status_code == 200
+        reset_data = reset_resp.json()
+        assert reset_data["status"] == "success"
+        assert reset_data["reset_count"] >= 1
+
+        art_resp = await ac.get(f"/api/v1/articles/{art_id}")
+        assert art_resp.status_code == 200
+        assert art_resp.json()["is_bundled"] is False
+
+        # Cleanup
+        await ac.delete(f"/api/v1/sources/{src_id}")

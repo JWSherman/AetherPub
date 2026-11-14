@@ -3,10 +3,32 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from sqlalchemy.orm import defer
 from backend.app.core.database import get_db
+from backend.app.core.event_bus import event_bus
 from backend.app.models.entities import Article, Source
 from backend.app.schemas.api_models import ArticleResponse
 
 router = APIRouter(prefix="/articles", tags=["Articles"])
+
+@router.post("/reset-bundled")
+async def reset_bundled_articles(db: AsyncSession = Depends(get_db)):
+    """Clears the 'is_bundled' flag on all articles so a new edition can be compiled from a clean slate."""
+    res = await db.execute(select(Article).where(Article.is_bundled == True))
+    bundled_articles = res.scalars().all()
+    reset_count = len(bundled_articles)
+    for art in bundled_articles:
+        art.is_bundled = False
+
+    await db.commit()
+
+    await event_bus.emit("articles:bundled_reset", {
+        "reset_count": reset_count
+    })
+
+    return {
+        "status": "success",
+        "reset_count": reset_count,
+        "message": f"Cleared 'bundled' status on {reset_count} article{'s' if reset_count != 1 else ''}. Ready to compile from a clean slate."
+    }
 
 @router.get("", response_model=list[ArticleResponse])
 async def list_articles(

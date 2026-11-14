@@ -394,9 +394,13 @@
                     </div>
                     <p class="text-xs text-zinc-400 mt-0.5">Manage compiled EPUB 3 files, inspect compilation &amp; download timestamps, read in browser, dispatch to Kindle, or delete publications.</p>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                     <button onclick="fetchEditions()" class="px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-mono flex items-center gap-1.5 transition-all" title="Refresh File Vault">
                         <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-cyan-400"></i> Refresh
+                    </button>
+                    <button id="btn-ed-reset-bundled" onclick="resetBundledArticles()" class="px-3.5 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-amber-500/40 text-amber-300 hover:text-amber-200 text-xs font-mono flex items-center gap-1.5 transition-all" title="Unmark all previously bundled articles so a new digest can be compiled from a clean slate">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-amber-400"></i>
+                        <span id="ed-reset-bundled-label">Clear Bundled</span>
                     </button>
                     <button onclick="triggerCompileNow()" class="px-4 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-mono font-semibold text-xs flex items-center gap-1.5 transition-all shadow-lg shadow-violet-600/30">
                         <i data-lucide="layers" class="w-4 h-4"></i> Compile New Digest
@@ -492,9 +496,17 @@
 
         <!-- TAB: INGESTED ARTICLES -->
         <section id="tab-articles" class="tab-content hidden space-y-6">
-            <div>
-                <h2 class="text-xl font-bold text-white">Ingested Articles Pool</h2>
-                <p class="text-xs text-zinc-400 mt-0.5">Scored articles discovered from tracked sources, awaiting daily bundling.</p>
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-white/5">
+                <div>
+                    <h2 class="text-xl font-bold text-white">Ingested Articles Pool</h2>
+                    <p class="text-xs text-zinc-400 mt-0.5">Scored articles discovered from tracked sources, awaiting daily bundling.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="btn-art-reset-bundled" onclick="resetBundledArticles()" class="px-3.5 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-amber-500/40 text-amber-300 hover:text-amber-200 text-xs font-mono flex items-center gap-1.5 transition-all" title="Unmark all previously bundled articles so a new digest can be compiled from a clean slate">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-amber-400"></i>
+                        <span id="art-reset-bundled-label">Clear Bundled</span>
+                    </button>
+                </div>
             </div>
 
             <div id="articles-list" class="space-y-3">

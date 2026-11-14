@@ -193,6 +193,10 @@ function handleIncomingEvent(eventType, payload) {
             appendLog('warn', `[${timestamp}] 🗑️ Deleted EPUB "${payload.file_name}"`);
             fetchEditions();
             break;
+        case 'articles:bundled_reset':
+            appendLog('info', `[${timestamp}] 🔄 Cleared 'Bundled' flag on ${payload.reset_count} articles (Clean Slate Ready)`);
+            fetchArticles();
+            break;
         default:
             appendLog('info', `[${timestamp}] [${eventType}] ${JSON.stringify(payload)}`);
     }
@@ -332,13 +336,21 @@ function updateDashboardKPIs() {
     const kpiArticles = document.getElementById('kpi-articles');
     const kpiEditions = document.getElementById('kpi-editions');
 
+    const unbundled = state.articles.filter(a => !a.is_bundled).length;
+    const bundled = state.articles.length - unbundled;
+
     if (kpiSources) kpiSources.textContent = state.sources.length;
     if (kpiKeywords) kpiKeywords.textContent = state.keywords.length;
     if (kpiArticles) {
-        const unbundled = state.articles.filter(a => !a.is_bundled).length;
         kpiArticles.textContent = `${unbundled} (${state.articles.length} total)`;
     }
     if (kpiEditions) kpiEditions.textContent = state.editions.length;
+
+    const edLabel = document.getElementById('ed-reset-bundled-label');
+    const artLabel = document.getElementById('art-reset-bundled-label');
+    const badgeText = bundled > 0 ? `Clear Bundled (${bundled})` : 'Clear Bundled';
+    if (edLabel) edLabel.textContent = badgeText;
+    if (artLabel) artLabel.textContent = badgeText;
 }
 
 // --- Renders ---
@@ -1640,6 +1652,18 @@ async function triggerCompileNow() {
         await fetch(`${API_BASE}/editions/build-now`, { method: 'POST' });
     } catch (e) {
         showToast('Compilation request failed', 'error');
+    }
+}
+
+async function resetBundledArticles() {
+    try {
+        const res = await fetch(`${API_BASE}/articles/reset-bundled`, { method: 'POST' });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to clear bundled state');
+        showToast(data.message || `Cleared bundled flag on ${data.reset_count} articles.`, 'success');
+        await fetchArticles();
+    } catch (e) {
+        showToast(e.message, 'error');
     }
 }
 
