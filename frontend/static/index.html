@@ -379,21 +379,114 @@
             </div>
         </section>
 
-        <!-- TAB: DAILY EDITIONS ARCHIVE -->
-        <section id="tab-editions" class="tab-content hidden space-y-6">
-            <div class="flex items-center justify-between">
+        <!-- TAB: DAILY EDITIONS FILE MANAGER -->
+        <section id="tab-editions" class="tab-content hidden space-y-5">
+            <!-- Header & Primary Actions -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-white/5">
                 <div>
-                    <h2 class="text-xl font-bold text-white">Daily Digest EPUB Archive</h2>
-                    <p class="text-xs text-zinc-400 mt-0.5">Download or wirelessly send compiled periodicals to your e-reader.</p>
+                    <div class="flex items-center gap-2.5">
+                        <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                            <i data-lucide="folder-kanban" class="w-5 h-5 text-cyan-400"></i> Daily Digest File Manager
+                        </h2>
+                        <span class="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-cyan-400">
+                            storage/epubs/
+                        </span>
+                    </div>
+                    <p class="text-xs text-zinc-400 mt-0.5">Manage compiled EPUB 3 files, inspect compilation &amp; download timestamps, read in browser, dispatch to Kindle, or delete publications.</p>
                 </div>
-                <button onclick="triggerCompileNow()" class="px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs flex items-center gap-1.5 transition-all shadow-lg shadow-violet-600/30">
-                    <i data-lucide="layers" class="w-4 h-4"></i> Compile New Digest
-                </button>
+                <div class="flex items-center gap-2">
+                    <button onclick="fetchEditions()" class="px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-mono flex items-center gap-1.5 transition-all" title="Refresh File Vault">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-cyan-400"></i> Refresh
+                    </button>
+                    <button onclick="triggerCompileNow()" class="px-4 py-2 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-mono font-semibold text-xs flex items-center gap-1.5 transition-all shadow-lg shadow-violet-600/30">
+                        <i data-lucide="layers" class="w-4 h-4"></i> Compile New Digest
+                    </button>
+                </div>
             </div>
 
-            <!-- Editions Card Grid -->
-            <div id="editions-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <!-- Populated dynamically -->
+            <!-- Vault Storage & Download Telemetry Strip -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div class="glass-panel p-3.5 rounded-xl flex items-center justify-between">
+                    <div>
+                        <span class="text-[11px] font-mono text-zinc-400 block">Stored EPUB Files</span>
+                        <div id="ed-stat-count" class="text-lg font-bold font-mono text-white mt-0.5">0 files</div>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg bg-cyan-950/60 border border-cyan-800/60 flex items-center justify-center">
+                        <i data-lucide="book" class="w-4 h-4 text-cyan-400"></i>
+                    </div>
+                </div>
+                <div class="glass-panel p-3.5 rounded-xl flex items-center justify-between">
+                    <div>
+                        <span class="text-[11px] font-mono text-zinc-400 block">Vault Disk Usage</span>
+                        <div id="ed-stat-size" class="text-lg font-bold font-mono text-white mt-0.5">0.00 MB</div>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg bg-violet-950/60 border border-violet-800/60 flex items-center justify-center">
+                        <i data-lucide="hard-drive" class="w-4 h-4 text-violet-400"></i>
+                    </div>
+                </div>
+                <div class="glass-panel p-3.5 rounded-xl flex items-center justify-between">
+                    <div>
+                        <span class="text-[11px] font-mono text-zinc-400 block">Total Downloads</span>
+                        <div id="ed-stat-downloads" class="text-lg font-bold font-mono text-emerald-400 mt-0.5">0</div>
+                    </div>
+                    <div class="w-8 h-8 rounded-lg bg-emerald-950/60 border border-emerald-800/60 flex items-center justify-center">
+                        <i data-lucide="download-cloud" class="w-4 h-4 text-emerald-400"></i>
+                    </div>
+                </div>
+                <div class="glass-panel p-3.5 rounded-xl flex items-center justify-between">
+                    <div class="min-w-0 pr-2">
+                        <span class="text-[11px] font-mono text-zinc-400 block">Last Downloaded</span>
+                        <div id="ed-stat-last-dl" class="text-xs font-bold font-mono text-zinc-200 mt-1 truncate">Never</div>
+                    </div>
+                    <div class="w-8 h-8 shrink-0 rounded-lg bg-amber-950/60 border border-amber-800/60 flex items-center justify-center">
+                        <i data-lucide="clock" class="w-4 h-4 text-amber-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File Explorer Toolbar -->
+            <div class="glass-panel p-3.5 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <label class="flex items-center gap-2 cursor-pointer text-xs font-mono text-zinc-300 select-none px-2 py-1 rounded hover:bg-zinc-800/60">
+                        <input id="ed-select-all" type="checkbox" onchange="toggleSelectAllEditions(this.checked)" class="rounded bg-zinc-900 border-zinc-700 text-cyan-500 focus:ring-0 cursor-pointer">
+                        <span>Select All</span>
+                    </label>
+                    <span id="ed-selected-count" class="text-[11px] font-mono text-zinc-500">0 selected</span>
+                    <button id="ed-bulk-delete-btn" onclick="bulkDeleteSelectedEditions()" class="hidden px-3 py-1.5 rounded-lg bg-rose-950/70 hover:bg-rose-900/80 border border-rose-800 text-rose-300 text-xs font-mono font-semibold flex items-center gap-1.5 transition-all">
+                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        <span id="ed-bulk-delete-label">Delete Selected</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                    <div class="relative flex-1 sm:w-56">
+                        <i data-lucide="search" class="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                        <input id="ed-search-input" type="text" oninput="handleEditionsFilterChange()" placeholder="Filter by filename, title, date..." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500 font-mono transition-colors">
+                    </div>
+
+                    <select id="ed-sort-select" onchange="handleEditionsFilterChange()" class="bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 font-mono focus:outline-none focus:border-cyan-500">
+                        <option value="created_desc">Compiled: Newest First</option>
+                        <option value="created_asc">Compiled: Oldest First</option>
+                        <option value="downloaded_desc">Downloaded: Most Recent</option>
+                        <option value="downloads_desc">Downloads: Most Frequent</option>
+                        <option value="size_desc">File Size: Largest</option>
+                        <option value="size_asc">File Size: Smallest</option>
+                    </select>
+
+                    <div class="flex items-center rounded-lg bg-zinc-900 border border-zinc-700 p-0.5">
+                        <button id="ed-view-list-btn" onclick="setEditionsViewMode('list')" class="px-2.5 py-1 rounded-md text-xs font-mono flex items-center gap-1 bg-zinc-800 text-cyan-400 transition-all" title="File Manager Table View">
+                            <i data-lucide="list" class="w-3.5 h-3.5"></i> Files
+                        </button>
+                        <button id="ed-view-grid-btn" onclick="setEditionsViewMode('grid')" class="px-2.5 py-1 rounded-md text-xs font-mono flex items-center gap-1 text-zinc-400 hover:text-zinc-200 transition-all" title="Cover Art Grid View">
+                            <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i> Covers
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Editions File Manager Container -->
+            <div id="editions-list">
+                <!-- Populated dynamically as File Table or Cover Grid -->
             </div>
         </section>
 

@@ -112,7 +112,13 @@ class EditionResponse(BaseModel):
     cover_path: str | None
     file_size_bytes: int
     sent_via_smtp: bool
+    download_count: int = 0
+    last_downloaded_at: datetime | None = None
+    download_timestamps: list[str] = []
     created_at: datetime
+
+class EditionBulkDeleteRequest(BaseModel):
+    edition_ids: list[str]
 
 class SettingItem(BaseModel):
     key: str

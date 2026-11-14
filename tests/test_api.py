@@ -128,3 +128,64 @@ async def test_curation_curves_and_source_weight_api():
         recalc_resp = await ac.post("/api/v1/curation/recalculate-scores")
         assert recalc_resp.status_code == 200
         assert "updated_articles" in recalc_resp.json()
+
+@pytest.mark.asyncio
+async def test_editions_download_timestamps_and_delete(tmp_path):
+    from backend.app.core.database import AsyncSessionLocal
+    from backend.app.models.entities import DailyEdition
+
+    await init_db()
+
+    epub_file = tmp_path / "test_edition.epub"
+    epub_file.write_bytes(b"PK\x03\x04dummy-epub-bytes")
+    cover_file = tmp_path / "test_edition_cover.jpg"
+    cover_file.write_bytes(b"\xff\xd8\xff\xe0dummy-jpeg")
+
+    async with AsyncSessionLocal() as session:
+        edition = DailyEdition(
+            title="Test File Manager Digest",
+            edition_date="2026-11-14",
+            article_count=3,
+            total_word_count=1500,
+            file_path=str(epub_file),
+            cover_path=str(cover_file),
+            file_size_bytes=24
+        )
+        session.add(edition)
+        await session.commit()
+        edition_id = edition.id
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # Initially never downloaded
+        list_resp = await ac.get("/api/v1/editions")
+        assert list_resp.status_code == 200
+        found = next(e for e in list_resp.json() if e["id"] == edition_id)
+        assert found["download_count"] == 0
+        assert found["last_downloaded_at"] is None
+        assert found["download_timestamps"] == []
+
+        # Download twice to record download date-times
+        dl1 = await ac.get(f"/api/v1/editions/{edition_id}/download")
+        assert dl1.status_code == 200
+        dl2 = await ac.get(f"/api/v1/editions/{edition_id}/download")
+        assert dl2.status_code == 200
+
+        # Verify download count and date-time history are recorded
+        detail_resp = await ac.get(f"/api/v1/editions/{edition_id}")
+        assert detail_resp.status_code == 200
+        detail = detail_resp.json()
+        assert detail["download_count"] == 2
+        assert detail["last_downloaded_at"] is not None
+        assert len(detail["download_timestamps"]) == 2
+
+        # Delete the edition via File Manager delete endpoint
+        del_resp = await ac.delete(f"/api/v1/editions/{edition_id}")
+        assert del_resp.status_code == 200
+        assert del_resp.json()["status"] == "deleted"
+
+        # Files on disk and DB record should be removed
+        assert not epub_file.exists()
+        assert not cover_file.exists()
+        missing_resp = await ac.get(f"/api/v1/editions/{edition_id}")
+        assert missing_resp.status_code == 404

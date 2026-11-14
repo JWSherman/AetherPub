@@ -50,7 +50,12 @@ const state = {
     },
     isCrawling: false,
     isCompiling: false,
-    terminalLogs: []
+    terminalLogs: [],
+    editionsViewMode: 'list',
+    selectedEditions: new Set(),
+    editionsSearchQuery: '',
+    editionsSortBy: 'created_desc',
+    expandedDownloadHistory: new Set()
 };
 
 // --- Initialization ---
@@ -179,6 +184,14 @@ function handleIncomingEvent(eventType, payload) {
             break;
         case 'curation:curves_updated':
             appendLog('info', `[${timestamp}] 📈 Curation curves updated`);
+            break;
+        case 'edition:downloaded':
+            appendLog('info', `[${timestamp}] 📥 Downloaded "${payload.file_name}" (Total: ${payload.download_count}x)`);
+            fetchEditions();
+            break;
+        case 'edition:deleted':
+            appendLog('warn', `[${timestamp}] 🗑️ Deleted EPUB "${payload.file_name}"`);
+            fetchEditions();
             break;
         default:
             appendLog('info', `[${timestamp}] [${eventType}] ${JSON.stringify(payload)}`);
@@ -992,18 +1005,301 @@ async function recalculateScores() {
     }
 }
 
-// --- Daily Editions Archive ---
+// --- Daily Editions File Manager ---
+function extractFileName(filePath) {
+    if (!filePath) return 'edition.epub';
+    const parts = filePath.split(/[/\\]/);
+    return parts[parts.length - 1] || 'edition.epub';
+}
+
+function parseIsoTimestamp(isoStr) {
+    if (!isoStr) return null;
+    const normalized = (typeof isoStr === 'string' && !isoStr.endsWith('Z') && !isoStr.includes('+') && !/\-\d{2}:\d{2}$/.test(isoStr))
+        ? `${isoStr}Z`
+        : isoStr;
+    const dt = new Date(normalized);
+    return isNaN(dt.getTime()) ? null : dt;
+}
+
+function formatDateTimeFull(isoStr) {
+    const dt = parseIsoTimestamp(isoStr);
+    if (!dt) return '—';
+    return dt.toLocaleString([], {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+}
+
+function formatFileSize(bytes) {
+    const num = Number(bytes) || 0;
+    if (num < 1024 * 1024) {
+        return `${Math.max(1, Math.round(num / 1024))} KB`;
+    }
+    return `${(num / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function setEditionsViewMode(mode) {
+    state.editionsViewMode = mode === 'grid' ? 'grid' : 'list';
+    const listBtn = document.getElementById('ed-view-list-btn');
+    const gridBtn = document.getElementById('ed-view-grid-btn');
+    if (listBtn && gridBtn) {
+        if (state.editionsViewMode === 'list') {
+            listBtn.className = 'px-2.5 py-1 rounded-md text-xs font-mono flex items-center gap-1 bg-zinc-800 text-cyan-400 transition-all';
+            gridBtn.className = 'px-2.5 py-1 rounded-md text-xs font-mono flex items-center gap-1 text-zinc-400 hover:text-zinc-200 transition-all';
+        } else {
+            gridBtn.className = 'px-2.5 py-1 rounded-md text-xs font-mono flex items-center gap-1 bg-zinc-800 text-cyan-400 transition-all';
+            listBtn.className = 'px-2.5 py-1 rounded-md text-xs font-mono flex items-center gap-1 text-zinc-400 hover:text-zinc-200 transition-all';
+        }
+    }
+    renderEditions();
+}
+
+function handleEditionsFilterChange() {
+    const searchInput = document.getElementById('ed-search-input');
+    const sortSelect = document.getElementById('ed-sort-select');
+    if (searchInput) state.editionsSearchQuery = searchInput.value.trim().toLowerCase();
+    if (sortSelect) state.editionsSortBy = sortSelect.value;
+    renderEditions();
+}
+
+function getFilteredAndSortedEditions() {
+    const q = state.editionsSearchQuery || '';
+    const filtered = state.editions.filter(ed => {
+        if (!q) return true;
+        const fname = extractFileName(ed.file_path).toLowerCase();
+        const title = (ed.title || '').toLowerCase();
+        const date = (ed.edition_date || '').toLowerCase();
+        return fname.includes(q) || title.includes(q) || date.includes(q);
+    });
+
+    const sortMode = state.editionsSortBy || 'created_desc';
+    filtered.sort((a, b) => {
+        const createdA = parseIsoTimestamp(a.created_at)?.getTime() || 0;
+        const createdB = parseIsoTimestamp(b.created_at)?.getTime() || 0;
+        const dlA = parseIsoTimestamp(a.last_downloaded_at || (a.download_timestamps && a.download_timestamps[0]))?.getTime() || 0;
+        const dlB = parseIsoTimestamp(b.last_downloaded_at || (b.download_timestamps && b.download_timestamps[0]))?.getTime() || 0;
+
+        switch (sortMode) {
+            case 'created_asc':
+                return createdA - createdB;
+            case 'downloaded_desc':
+                return dlB - dlA || createdB - createdA;
+            case 'downloads_desc':
+                return ((b.download_count || 0) - (a.download_count || 0)) || createdB - createdA;
+            case 'size_desc':
+                return ((b.file_size_bytes || 0) - (a.file_size_bytes || 0));
+            case 'size_asc':
+                return ((a.file_size_bytes || 0) - (b.file_size_bytes || 0));
+            case 'created_desc':
+            default:
+                return createdB - createdA;
+        }
+    });
+
+    return filtered;
+}
+
+function updateEditionsVaultStats() {
+    const countEl = document.getElementById('ed-stat-count');
+    const sizeEl = document.getElementById('ed-stat-size');
+    const dlEl = document.getElementById('ed-stat-downloads');
+    const lastDlEl = document.getElementById('ed-stat-last-dl');
+
+    const totalFiles = state.editions.length;
+    const totalBytes = state.editions.reduce((acc, ed) => acc + (ed.file_size_bytes || 0), 0);
+    const totalDownloads = state.editions.reduce((acc, ed) => acc + (ed.download_count || 0), 0);
+
+    let latestDlTime = 0;
+    let latestDlStr = 'Never';
+    state.editions.forEach(ed => {
+        const rawTs = ed.last_downloaded_at || (ed.download_timestamps && ed.download_timestamps[0]);
+        const dt = parseIsoTimestamp(rawTs);
+        if (dt && dt.getTime() > latestDlTime) {
+            latestDlTime = dt.getTime();
+            latestDlStr = formatDateTimeFull(rawTs);
+        }
+    });
+
+    if (countEl) countEl.textContent = `${totalFiles} ${totalFiles === 1 ? 'file' : 'files'}`;
+    if (sizeEl) sizeEl.textContent = `${(totalBytes / 1024 / 1024).toFixed(2)} MB`;
+    if (dlEl) dlEl.textContent = `${totalDownloads}`;
+    if (lastDlEl) {
+        lastDlEl.textContent = latestDlStr;
+        lastDlEl.title = latestDlStr;
+    }
+
+    // Prune any selected IDs that no longer exist
+    const validIds = new Set(state.editions.map(e => e.id));
+    for (const id of state.selectedEditions) {
+        if (!validIds.has(id)) state.selectedEditions.delete(id);
+    }
+    updateEditionSelectionToolbar();
+}
+
+function updateEditionSelectionToolbar() {
+    const selCount = state.selectedEditions.size;
+    const countBadge = document.getElementById('ed-selected-count');
+    const bulkBtn = document.getElementById('ed-bulk-delete-btn');
+    const bulkLabel = document.getElementById('ed-bulk-delete-label');
+    const selectAllCb = document.getElementById('ed-select-all');
+
+    if (countBadge) countBadge.textContent = `${selCount} selected`;
+    if (bulkBtn) {
+        if (selCount > 0) {
+            bulkBtn.classList.remove('hidden');
+            if (bulkLabel) bulkLabel.textContent = `Delete Selected (${selCount})`;
+        } else {
+            bulkBtn.classList.add('hidden');
+        }
+    }
+    if (selectAllCb) {
+        const visible = getFilteredAndSortedEditions();
+        selectAllCb.checked = visible.length > 0 && visible.every(ed => state.selectedEditions.has(ed.id));
+    }
+}
+
+function toggleSelectEdition(editionId, checked) {
+    if (checked) {
+        state.selectedEditions.add(editionId);
+    } else {
+        state.selectedEditions.delete(editionId);
+    }
+    updateEditionSelectionToolbar();
+}
+
+function toggleSelectAllEditions(checked) {
+    const visible = getFilteredAndSortedEditions();
+    visible.forEach(ed => {
+        if (checked) {
+            state.selectedEditions.add(ed.id);
+        } else {
+            state.selectedEditions.delete(ed.id);
+        }
+    });
+    renderEditions();
+}
+
+function toggleDownloadHistoryDrawer(editionId) {
+    if (state.expandedDownloadHistory.has(editionId)) {
+        state.expandedDownloadHistory.delete(editionId);
+    } else {
+        state.expandedDownloadHistory.add(editionId);
+    }
+    renderEditions();
+}
+
+function onEditionDownloadClick(editionId) {
+    setTimeout(() => {
+        fetchEditions();
+    }, 500);
+}
+
+async function deleteEdition(editionId, editionTitle = 'this digest') {
+    if (!confirm(`Delete "${editionTitle}" and permanently remove its EPUB file from storage?`)) return;
+    try {
+        const res = await fetch(`${API_BASE}/editions/${editionId}`, { method: 'DELETE' });
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.detail || 'Failed to delete edition');
+        }
+        state.selectedEditions.delete(editionId);
+        state.expandedDownloadHistory.delete(editionId);
+        showToast(`Deleted "${editionTitle}"`, 'info');
+        fetchEditions();
+    } catch (e) {
+        showToast(`Delete failed: ${e.message}`, 'error');
+    }
+}
+
+async function bulkDeleteSelectedEditions() {
+    const ids = Array.from(state.selectedEditions);
+    if (ids.length === 0) return;
+    if (!confirm(`Permanently delete ${ids.length} selected EPUB ${ids.length === 1 ? 'file' : 'files'} from storage?`)) return;
+
+    try {
+        const res = await fetch(`${API_BASE}/editions/bulk-delete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ edition_ids: ids })
+        });
+        if (!res.ok) throw new Error('Bulk delete failed');
+        const data = await res.json();
+        state.selectedEditions.clear();
+        showToast(`Deleted ${data.deleted_count} EPUB ${data.deleted_count === 1 ? 'file' : 'files'}`, 'info');
+        fetchEditions();
+    } catch (e) {
+        showToast(e.message, 'error');
+    }
+}
+
+function renderDownloadTimestampsBlock(ed) {
+    const timestamps = Array.isArray(ed.download_timestamps) && ed.download_timestamps.length > 0
+        ? ed.download_timestamps
+        : (ed.last_downloaded_at ? [ed.last_downloaded_at] : []);
+    const dlCount = ed.download_count || timestamps.length || 0;
+
+    if (dlCount === 0 || timestamps.length === 0) {
+        return `
+            <div class="font-mono text-xs text-zinc-500 flex items-center gap-1.5">
+                <i data-lucide="minus-circle" class="w-3.5 h-3.5 text-zinc-600"></i>
+                <span>Never downloaded</span>
+            </div>
+        `;
+    }
+
+    const latestFormatted = formatDateTimeFull(timestamps[0]);
+    const isExpanded = state.expandedDownloadHistory.has(ed.id);
+    const hasMultiple = timestamps.length > 1;
+
+    return `
+        <div class="space-y-1">
+            <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="font-mono text-xs text-emerald-400 flex items-center gap-1" title="Last downloaded at ${latestFormatted}">
+                    <i data-lucide="download-cloud" class="w-3.5 h-3.5 shrink-0"></i>
+                    <span>${latestFormatted}</span>
+                </span>
+                <span class="px-1.5 py-0.5 rounded bg-emerald-950/60 border border-emerald-800/70 text-[10px] font-mono text-emerald-300">
+                    ${dlCount}x
+                </span>
+                ${hasMultiple ? `
+                    <button onclick="toggleDownloadHistoryDrawer('${ed.id}')" class="text-[10px] font-mono text-cyan-400 hover:underline ml-0.5">
+                        ${isExpanded ? 'Hide log' : `All (${timestamps.length})`}
+                    </button>
+                ` : ''}
+            </div>
+            ${(isExpanded && hasMultiple) ? `
+                <div class="mt-1.5 p-2 rounded-lg bg-zinc-950/90 border border-zinc-800 space-y-1 max-h-28 overflow-y-auto">
+                    <div class="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">Download Timestamps:</div>
+                    ${timestamps.map((ts, idx) => `
+                        <div class="text-[11px] font-mono text-zinc-300 flex items-center justify-between gap-2">
+                            <span class="text-zinc-500">#${timestamps.length - idx}</span>
+                            <span>${formatDateTimeFull(ts)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
+        </div>
+    `;
+}
+
 function renderEditions() {
     const container = document.getElementById('editions-list');
     if (!container) return;
 
+    updateEditionsVaultStats();
+
     if (state.editions.length === 0) {
+        container.className = '';
         container.innerHTML = `
-            <div class="col-span-full py-16 text-center border border-dashed border-zinc-800 rounded-xl bg-zinc-950/40">
-                <i data-lucide="book-open" class="w-10 h-10 text-zinc-600 mx-auto mb-3"></i>
-                <p class="text-zinc-400 font-medium">No daily editions compiled yet</p>
-                <p class="text-zinc-600 text-sm mt-1">Click "Compile Digest Now" to bundle available articles into your first EPUB!</p>
-                <button onclick="triggerCompileNow()" class="mt-4 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-medium text-sm transition-all shadow-lg shadow-violet-600/30">
+            <div class="py-16 text-center border border-dashed border-zinc-800 rounded-xl bg-zinc-950/40">
+                <i data-lucide="folder-open" class="w-10 h-10 text-zinc-600 mx-auto mb-3"></i>
+                <p class="text-zinc-400 font-medium">EPUB Vault is empty</p>
+                <p class="text-zinc-600 text-xs font-mono mt-1">Click "Compile New Digest" to bundle available articles into your first EPUB 3 file.</p>
+                <button onclick="triggerCompileNow()" class="mt-4 px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-mono font-semibold text-xs transition-all shadow-lg shadow-violet-600/30">
                     📚 Compile Edition Now
                 </button>
             </div>
@@ -1012,58 +1308,214 @@ function renderEditions() {
         return;
     }
 
-    container.innerHTML = state.editions.map(ed => {
-        const downloadUrl = `${API_BASE}/editions/${ed.id}/download`;
-        const sizeMb = (ed.file_size_bytes / 1024 / 1024).toFixed(2);
-        const coverImg = ed.cover_path ? `${API_BASE}/editions/${ed.id}/cover` : null;
-
-        return `
-            <div class="glass-panel rounded-xl overflow-hidden flex flex-col justify-between group border border-white/5 hover:border-violet-500/30 transition-all">
-                <div>
-                    ${coverImg ? `
-                        <div class="w-full h-44 bg-zinc-950 relative overflow-hidden border-b border-zinc-800">
-                            <img src="${coverImg}" alt="${ed.title} Cover" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
-                        </div>
-                    ` : ''}
-
-                    <div class="p-5">
-                        <span class="text-xs font-mono text-cyan-400 block">${ed.edition_date}</span>
-                        <h3 class="font-bold text-lg text-white mt-1 group-hover:text-violet-400 transition-colors">
-                            ${ed.title}
-                        </h3>
-
-                        <div class="mt-4 flex flex-wrap gap-2 text-xs">
-                            <span class="px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 font-mono">
-                                ${ed.article_count} Articles
-                            </span>
-                            <span class="px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 font-mono">
-                                ${sizeMb} MB
-                            </span>
-                            ${ed.sent_via_smtp ? `
-                                <span class="px-2 py-1 rounded bg-emerald-950/60 border border-emerald-800 text-emerald-400 font-mono flex items-center gap-1">
-                                    <i data-lucide="check" class="w-3 h-3"></i> Sent to Kindle
-                                </span>
-                            ` : ''}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="p-5 pt-0">
-                    <div class="flex items-center gap-2 border-t border-zinc-800/80 pt-4">
-                        <button onclick="readEditionInBrowser('${ed.id}')" class="flex-1 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-all">
-                            <i data-lucide="book-open" class="w-3.5 h-3.5 text-cyan-400"></i> Read In Browser
-                        </button>
-                        <a href="${downloadUrl}" download class="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white transition-all" title="Download EPUB">
-                            <i data-lucide="download" class="w-4 h-4"></i>
-                        </a>
-                        <button onclick="sendEditionEmail('${ed.id}')" class="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-violet-400 hover:text-violet-300 transition-all" title="Send to Kindle via SMTP">
-                            <i data-lucide="send" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                </div>
+    const filtered = getFilteredAndSortedEditions();
+    if (filtered.length === 0) {
+        container.className = '';
+        container.innerHTML = `
+            <div class="py-12 text-center border border-dashed border-zinc-800 rounded-xl bg-zinc-950/40">
+                <i data-lucide="search-x" class="w-8 h-8 text-zinc-600 mx-auto mb-2"></i>
+                <p class="text-zinc-400 text-xs font-mono">No EPUB files match "${state.editionsSearchQuery}"</p>
             </div>
         `;
-    }).join('');
+        lucide.createIcons();
+        return;
+    }
+
+    if (state.editionsViewMode === 'grid') {
+        container.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5';
+        container.innerHTML = filtered.map(ed => {
+            const downloadUrl = `${API_BASE}/editions/${ed.id}/download`;
+            const fileName = extractFileName(ed.file_path);
+            const sizeFormatted = formatFileSize(ed.file_size_bytes);
+            const compiledFormatted = formatDateTimeFull(ed.created_at);
+            const coverImg = ed.cover_path ? `${API_BASE}/editions/${ed.id}/cover` : null;
+            const isChecked = state.selectedEditions.has(ed.id);
+            const safeTitle = (ed.title || '').replace(/'/g, "\\'");
+
+            return `
+                <div class="glass-panel rounded-xl overflow-hidden flex flex-col justify-between group border ${isChecked ? 'border-cyan-500/60' : 'border-white/5'} hover:border-cyan-500/30 transition-all">
+                    <div>
+                        <div class="relative w-full h-40 bg-zinc-950 overflow-hidden border-b border-zinc-800">
+                            ${coverImg ? `
+                                <img src="${coverImg}" alt="${ed.title} Cover" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                            ` : `
+                                <div class="w-full h-full flex items-center justify-center text-zinc-700">
+                                    <i data-lucide="book" class="w-10 h-10"></i>
+                                </div>
+                            `}
+                            <div class="absolute top-3 left-3 flex items-center gap-2 bg-zinc-950/85 backdrop-blur-md px-2.5 py-1 rounded-lg border border-white/10">
+                                <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleSelectEdition('${ed.id}', this.checked)" class="rounded bg-zinc-900 border-zinc-700 text-cyan-500 focus:ring-0 cursor-pointer">
+                                <span class="text-[10px] font-mono text-cyan-400 truncate max-w-[160px]" title="${fileName}">${fileName}</span>
+                            </div>
+                            <span class="absolute top-3 right-3 px-2 py-0.5 rounded bg-zinc-950/85 border border-white/10 text-[10px] font-mono text-zinc-200">
+                                ${sizeFormatted}
+                            </span>
+                        </div>
+
+                        <div class="p-4 space-y-3">
+                            <div>
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-[11px] font-mono text-cyan-400">${ed.edition_date}</span>
+                                    ${ed.sent_via_smtp ? `
+                                        <span class="px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800 text-emerald-400 text-[10px] font-mono flex items-center gap-1">
+                                            <i data-lucide="check" class="w-3 h-3"></i> Sent to Kindle
+                                        </span>
+                                    ` : ''}
+                                </div>
+                                <h3 class="font-bold text-base text-white mt-0.5 group-hover:text-cyan-400 transition-colors truncate" title="${ed.title}">
+                                    ${ed.title}
+                                </h3>
+                            </div>
+
+                            <div class="flex flex-wrap gap-1.5 text-[11px] font-mono">
+                                <span class="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300">
+                                    ${ed.article_count} Articles
+                                </span>
+                                <span class="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400">
+                                    ${(ed.total_word_count || 0).toLocaleString()} words
+                                </span>
+                            </div>
+
+                            <div class="p-2.5 rounded-lg bg-zinc-950/80 border border-zinc-800/90 space-y-1.5 text-xs">
+                                <div class="flex items-center justify-between gap-2 font-mono text-[11px]">
+                                    <span class="text-zinc-500">Compiled:</span>
+                                    <span class="text-zinc-300">${compiledFormatted}</span>
+                                </div>
+                                <div class="pt-1 border-t border-zinc-800/70">
+                                    <span class="text-[10px] font-mono text-zinc-500 block mb-0.5">Downloaded:</span>
+                                    ${renderDownloadTimestampsBlock(ed)}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-4 pt-0">
+                        <div class="flex items-center gap-1.5 border-t border-zinc-800/80 pt-3">
+                            <button onclick="readEditionInBrowser('${ed.id}')" class="flex-1 py-1.5 px-2.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-mono font-medium flex items-center justify-center gap-1.5 transition-all" title="Read In Browser">
+                                <i data-lucide="book-open" class="w-3.5 h-3.5 text-cyan-400"></i> Read
+                            </button>
+                            <a href="${downloadUrl}" download onclick="onEditionDownloadClick('${ed.id}')" class="py-1.5 px-2.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-500/30 text-cyan-300 text-xs font-mono flex items-center gap-1 transition-all" title="Download EPUB File">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                            </a>
+                            <button onclick="sendEditionEmail('${ed.id}')" class="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-violet-400 hover:text-violet-300 transition-all" title="Send to Kindle via SMTP">
+                                <i data-lucide="send" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="deleteEdition('${ed.id}', '${safeTitle}')" class="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-950/40 transition-all" title="Delete EPUB File">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        lucide.createIcons();
+        return;
+    }
+
+    // Default File Manager Table View ('list')
+    container.className = 'glass-panel rounded-xl overflow-hidden border border-white/10';
+    container.innerHTML = `
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-zinc-900/90 border-b border-zinc-800 text-[11px] font-mono uppercase tracking-wider text-zinc-400">
+                        <th class="py-3 pl-4 pr-2 w-8"></th>
+                        <th class="py-3 px-3">Publication / EPUB File</th>
+                        <th class="py-3 px-3">Specs &amp; Size</th>
+                        <th class="py-3 px-3">Compiled Date-Time</th>
+                        <th class="py-3 px-3">Downloaded Date-Time(s)</th>
+                        <th class="py-3 px-3">Delivery</th>
+                        <th class="py-3 pl-3 pr-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-800/80 text-xs">
+                    ${filtered.map(ed => {
+                        const downloadUrl = `${API_BASE}/editions/${ed.id}/download`;
+                        const fileName = extractFileName(ed.file_path);
+                        const sizeFormatted = formatFileSize(ed.file_size_bytes);
+                        const compiledFormatted = formatDateTimeFull(ed.created_at);
+                        const coverImg = ed.cover_path ? `${API_BASE}/editions/${ed.id}/cover` : null;
+                        const isChecked = state.selectedEditions.has(ed.id);
+                        const safeTitle = (ed.title || '').replace(/'/g, "\\'");
+
+                        return `
+                            <tr class="hover:bg-zinc-900/50 transition-colors ${isChecked ? 'bg-cyan-950/15' : ''}">
+                                <td class="py-3.5 pl-4 pr-2 align-top">
+                                    <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleSelectEdition('${ed.id}', this.checked)" class="mt-1 rounded bg-zinc-900 border-zinc-700 text-cyan-500 focus:ring-0 cursor-pointer">
+                                </td>
+                                <td class="py-3.5 px-3 align-top">
+                                    <div class="flex items-start gap-3">
+                                        <div onclick="readEditionInBrowser('${ed.id}')" class="w-10 h-14 rounded bg-zinc-950 border border-zinc-800 overflow-hidden shrink-0 cursor-pointer flex items-center justify-center hover:border-cyan-500/50 transition-all" title="Click to Read In Browser">
+                                            ${coverImg ? `
+                                                <img src="${coverImg}" alt="Cover" class="w-full h-full object-cover">
+                                            ` : `
+                                                <i data-lucide="file-text" class="w-4 h-4 text-cyan-400"></i>
+                                            `}
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="font-semibold text-sm text-white hover:text-cyan-400 cursor-pointer transition-colors truncate max-w-xs" onclick="readEditionInBrowser('${ed.id}')" title="${ed.title}">
+                                                ${ed.title}
+                                            </div>
+                                            <div class="font-mono text-[11px] text-cyan-400/90 flex items-center gap-1.5 mt-0.5 truncate max-w-xs" title="${ed.file_path}">
+                                                <i data-lucide="file-archive" class="w-3 h-3 shrink-0"></i>
+                                                <span class="truncate">${fileName}</span>
+                                            </div>
+                                            <div class="font-mono text-[10px] text-zinc-500 mt-0.5">
+                                                Issue Date: ${ed.edition_date}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td class="py-3.5 px-3 align-top font-mono">
+                                    <div class="text-white font-semibold">${sizeFormatted}</div>
+                                    <div class="text-[11px] text-zinc-400 mt-0.5">${ed.article_count} ${ed.article_count === 1 ? 'chapter' : 'chapters'}</div>
+                                    <div class="text-[10px] text-zinc-500">${(ed.total_word_count || 0).toLocaleString()} words</div>
+                                </td>
+                                <td class="py-3.5 px-3 align-top font-mono">
+                                    <div class="text-zinc-200 flex items-center gap-1.5">
+                                        <i data-lucide="calendar-clock" class="w-3.5 h-3.5 text-violet-400 shrink-0"></i>
+                                        <span>${compiledFormatted}</span>
+                                    </div>
+                                </td>
+                                <td class="py-3.5 px-3 align-top">
+                                    ${renderDownloadTimestampsBlock(ed)}
+                                </td>
+                                <td class="py-3.5 px-3 align-top font-mono">
+                                    ${ed.sent_via_smtp ? `
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-800 text-emerald-400 text-[11px]">
+                                            <i data-lucide="check" class="w-3 h-3"></i> Kindle Sent
+                                        </span>
+                                    ` : `
+                                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-400 text-[11px]">
+                                            <i data-lucide="hard-drive" class="w-3 h-3 text-cyan-400"></i> Local Vault
+                                        </span>
+                                    `}
+                                </td>
+                                <td class="py-3.5 pl-3 pr-4 align-top text-right">
+                                    <div class="inline-flex items-center justify-end gap-1.5">
+                                        <button onclick="readEditionInBrowser('${ed.id}')" class="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-mono flex items-center gap-1 transition-all" title="Read In Browser">
+                                            <i data-lucide="book-open" class="w-3.5 h-3.5 text-cyan-400"></i>
+                                            <span class="hidden xl:inline">Read</span>
+                                        </button>
+                                        <a href="${downloadUrl}" download onclick="onEditionDownloadClick('${ed.id}')" class="px-2.5 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-mono font-semibold text-xs flex items-center gap-1 transition-all shadow-sm shadow-cyan-500/20" title="Download EPUB">
+                                            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                            <span class="hidden xl:inline">Download</span>
+                                        </a>
+                                        <button onclick="sendEditionEmail('${ed.id}')" class="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-violet-400 hover:text-violet-300 transition-all" title="Send to Kindle via SMTP">
+                                            <i data-lucide="send" class="w-3.5 h-3.5"></i>
+                                        </button>
+                                        <button onclick="deleteEdition('${ed.id}', '${safeTitle}')" class="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-950/40 transition-all" title="Delete EPUB File">
+                                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
 
     lucide.createIcons();
 }
@@ -1083,22 +1535,38 @@ function renderDashboardEditions() {
 
     const latest = state.editions[0];
     const downloadUrl = `${API_BASE}/editions/${latest.id}/download`;
+    const compiledStr = formatDateTimeFull(latest.created_at);
+    const lastDlRaw = latest.last_downloaded_at || (latest.download_timestamps && latest.download_timestamps[0]);
+    const lastDlStr = lastDlRaw ? formatDateTimeFull(lastDlRaw) : 'Not downloaded yet';
+    const safeTitle = (latest.title || '').replace(/'/g, "\\'");
 
     container.innerHTML = `
-        <div class="flex items-center justify-between gap-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-                <span class="text-xs font-mono text-cyan-400 uppercase tracking-wider">Latest Digest</span>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-mono text-cyan-400 uppercase tracking-wider">Latest Digest</span>
+                    <span class="text-[11px] font-mono text-zinc-500">&bull; ${extractFileName(latest.file_path)}</span>
+                </div>
                 <h4 class="text-lg font-bold text-white mt-0.5">${latest.title}</h4>
-                <p class="text-xs text-zinc-400 font-mono mt-1">
-                    ${latest.article_count} Articles &bull; ${(latest.file_size_bytes / 1024 / 1024).toFixed(2)} MB &bull; ${new Date(latest.created_at).toLocaleDateString()}
+                <p class="text-xs text-zinc-400 font-mono mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <span>${latest.article_count} Articles</span>
+                    <span>&bull; ${formatFileSize(latest.file_size_bytes)}</span>
+                    <span>&bull; Compiled: <strong class="text-zinc-200">${compiledStr}</strong></span>
+                    <span>&bull; Downloaded: <strong class="${lastDlRaw ? 'text-emerald-400' : 'text-zinc-500'}">${lastDlStr}</strong></span>
                 </p>
             </div>
-            <div class="flex items-center gap-2">
-                <a href="${downloadUrl}" download class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs flex items-center gap-2 transition-all shadow-lg shadow-cyan-500/20">
+            <div class="flex items-center gap-2 shrink-0">
+                <button onclick="readEditionInBrowser('${latest.id}')" class="px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-mono flex items-center gap-1.5 transition-all" title="Read In Browser">
+                    <i data-lucide="book-open" class="w-4 h-4 text-cyan-400"></i> Read
+                </button>
+                <a href="${downloadUrl}" download onclick="onEditionDownloadClick('${latest.id}')" class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs flex items-center gap-2 transition-all shadow-lg shadow-cyan-500/20">
                     <i data-lucide="download" class="w-4 h-4"></i> Download
                 </a>
                 <button onclick="sendEditionEmail('${latest.id}')" class="px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs flex items-center gap-1.5 transition-all" title="Send to Device">
                     <i data-lucide="send" class="w-4 h-4 text-violet-400"></i>
+                </button>
+                <button onclick="deleteEdition('${latest.id}', '${safeTitle}')" class="p-2 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-rose-950/40 transition-all" title="Delete Edition">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
                 </button>
             </div>
         </div>

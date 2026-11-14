@@ -86,6 +86,19 @@ async def init_db():
             except Exception:
                 pass
 
+            try:
+                res_ed = sync_conn.execute(text("PRAGMA table_info(daily_editions)"))
+                ed_cols = [row[1] for row in res_ed.fetchall()]
+                if ed_cols:
+                    if "download_count" not in ed_cols:
+                        sync_conn.execute(text("ALTER TABLE daily_editions ADD COLUMN download_count INTEGER DEFAULT 0"))
+                    if "last_downloaded_at" not in ed_cols:
+                        sync_conn.execute(text("ALTER TABLE daily_editions ADD COLUMN last_downloaded_at DATETIME"))
+                    if "download_history" not in ed_cols:
+                        sync_conn.execute(text("ALTER TABLE daily_editions ADD COLUMN download_history TEXT DEFAULT '[]'"))
+            except Exception:
+                pass
+
         await conn.run_sync(migrate_schema)
 
     try:

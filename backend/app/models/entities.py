@@ -1,4 +1,5 @@
 import uuid
+import json
 from datetime import datetime, timezone
 from sqlalchemy import String, Integer, Float, Boolean, Text, DateTime, ForeignKey, Table, Column
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -76,9 +77,22 @@ class DailyEdition(Base):
     cover_path: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     file_size_bytes: Mapped[int] = mapped_column(Integer, default=0)
     sent_via_smtp: Mapped[bool] = mapped_column(Boolean, default=False)
+    download_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_downloaded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    download_history: Mapped[str | None] = mapped_column(Text, default="[]")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     articles: Mapped[list["Article"]] = relationship("Article", secondary=edition_articles, back_populates="editions")
+
+    @property
+    def download_timestamps(self) -> list[str]:
+        if not self.download_history:
+            return []
+        try:
+            data = json.loads(self.download_history)
+            return data if isinstance(data, list) else []
+        except Exception:
+            return []
 
 class Setting(Base):
     __tablename__ = "settings"
