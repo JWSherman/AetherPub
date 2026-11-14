@@ -237,3 +237,54 @@ async def test_reset_bundled_articles():
 
         # Cleanup
         await ac.delete(f"/api/v1/sources/{src_id}")
+
+@pytest.mark.asyncio
+async def test_image_quality_settings_and_epub_recompression():
+    import io
+    import zipfile
+    from PIL import Image
+    from backend.app.services.delivery.smtp_client import SMTPDeliveryService
+
+    await init_db()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        get_resp = await ac.get("/api/v1/settings")
+        assert get_resp.status_code == 200
+        initial = get_resp.json()
+        assert "JPEG_QUALITY" in initial
+        assert "MAX_IMAGE_WIDTH" in initial
+
+        save_resp = await ac.post("/api/v1/settings", json={
+            "JPEG_QUALITY": "40",
+            "MAX_IMAGE_WIDTH": "1000"
+        })
+        assert save_resp.status_code == 200
+
+        updated = (await ac.get("/api/v1/settings")).json()
+        assert updated["JPEG_QUALITY"] == "40"
+        assert updated["MAX_IMAGE_WIDTH"] == "1000"
+
+        # Restore defaults
+        await ac.post("/api/v1/settings", json={
+            "JPEG_QUALITY": "85",
+            "MAX_IMAGE_WIDTH": "1600"
+        })
+
+    # Verify in-memory EPUB image recompression for SMTP
+    img = Image.effect_mandelbrot((1600, 1600), (-2.0, -1.5, 1.0, 1.5), 64).convert("RGB")
+    img_buf = io.BytesIO()
+    img.save(img_buf, format="JPEG", quality=92)
+    orig_img_bytes = img_buf.getvalue()
+
+    epub_buf = io.BytesIO()
+    with zipfile.ZipFile(epub_buf, "w") as zf:
+        zf.writestr("EPUB/images/sample.jpg", orig_img_bytes)
+        zf.writestr("EPUB/chapter_1.xhtml", b"<html><body>Test</body></html>")
+    orig_epub = epub_buf.getvalue()
+
+    compressed_epub = SMTPDeliveryService._recompress_epub_images(orig_epub, jpeg_quality=35, max_dim=800)
+    assert len(compressed_epub) < len(orig_epub)
+    with zipfile.ZipFile(io.BytesIO(compressed_epub), "r") as zf:
+        re_img = Image.open(io.BytesIO(zf.read("EPUB/images/sample.jpg")))
+        assert re_img.mode == "RGB"
+        assert max(re_img.size) <= 800

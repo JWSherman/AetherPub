@@ -100,3 +100,33 @@ async def test_image_processor_handles_graphic_tags_and_caching():
         assert len(manifest2) == 1
         assert "images/art_gi_999_0.jpg" in epub_html2
         assert "<img" in epub_html2
+
+@pytest.mark.asyncio
+async def test_image_processor_configurable_quality_and_dimensions():
+    # Generate a noisy 1600x1600 RGB image where JPEG quality significantly changes byte size
+    img = Image.effect_mandelbrot((1600, 1600), (-2.0, -1.5, 1.0, 1.5), 64).convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    raw_bytes = buf.getvalue()
+
+    transport = httpx.MockTransport(lambda req: httpx.Response(200, content=raw_bytes))
+    async with httpx.AsyncClient(transport=transport) as client:
+        high_proc = ImageProcessor(client, jpeg_quality=90, max_dimension=1600)
+        low_proc = ImageProcessor(client, jpeg_quality=35, max_dimension=800)
+
+        _, high_manifest = await high_proc.process_article_images(
+            '<p><img src="https://example.com/fractal.png" /></p>',
+            article_id="qual_test"
+        )
+        _, low_manifest = await low_proc.process_article_images(
+            '<p><img src="https://example.com/fractal.png" /></p>',
+            article_id="qual_test"
+        )
+
+        assert len(high_manifest) == 1
+        assert len(low_manifest) == 1
+        assert len(low_manifest[0]["content"]) < len(high_manifest[0]["content"])
+
+        low_img = Image.open(io.BytesIO(low_manifest[0]["content"]))
+        assert low_img.mode == "RGB"
+        assert max(low_img.size) <= 800

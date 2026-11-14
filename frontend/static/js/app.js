@@ -1919,6 +1919,22 @@ async function evaluateSandbox() {
 }
 
 // --- Settings Form ---
+function updateJpegQualityPreview(val) {
+    const badge = document.getElementById('cfg-jpeg-quality-badge');
+    if (badge) badge.textContent = `${val}%`;
+}
+
+function setJpegQualityPreset(quality, maxDim = null) {
+    const qInput = document.getElementById('cfg-jpeg-quality');
+    if (qInput) qInput.value = String(quality);
+    updateJpegQualityPreview(quality);
+
+    if (maxDim) {
+        const dimSelect = document.getElementById('cfg-max-image-width');
+        if (dimSelect) dimSelect.value = String(maxDim);
+    }
+}
+
 function loadSettingsForm() {
     const s = state.settings;
     if (!s) return;
@@ -1931,6 +1947,9 @@ function loadSettingsForm() {
     setVal('cfg-cron-hour', s.DAILY_CRON_HOUR);
     setVal('cfg-cron-minute', s.DAILY_CRON_MINUTE);
     setVal('cfg-daily-limit', s.DAILY_ARTICLE_LIMIT);
+    setVal('cfg-jpeg-quality', s.JPEG_QUALITY || '85');
+    updateJpegQualityPreview(s.JPEG_QUALITY || '85');
+    setVal('cfg-max-image-width', s.MAX_IMAGE_WIDTH || '1600');
     setVal('cfg-kindle-email', s.DEFAULT_KINDLE_EMAIL);
     setVal('cfg-smtp-host', s.SMTP_HOST);
     setVal('cfg-smtp-port', s.SMTP_PORT);
@@ -1950,6 +1969,8 @@ async function saveSettingsForm(e) {
         DAILY_CRON_HOUR: getVal('cfg-cron-hour'),
         DAILY_CRON_MINUTE: getVal('cfg-cron-minute'),
         DAILY_ARTICLE_LIMIT: getVal('cfg-daily-limit'),
+        JPEG_QUALITY: getVal('cfg-jpeg-quality') || '85',
+        MAX_IMAGE_WIDTH: getVal('cfg-max-image-width') || '1600',
         DEFAULT_KINDLE_EMAIL: getVal('cfg-kindle-email'),
         AUTO_SEND_SMTP: document.getElementById('cfg-auto-send')?.checked ? 'true' : 'false',
         SMTP_HOST: getVal('cfg-smtp-host'),

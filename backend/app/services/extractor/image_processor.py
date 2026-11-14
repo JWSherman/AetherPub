@@ -9,13 +9,50 @@ from urllib.parse import urljoin
 from backend.app.core.config import settings
 
 class ImageProcessor:
-    def __init__(self, client: httpx.AsyncClient):
+    def __init__(
+        self,
+        client: httpx.AsyncClient,
+        jpeg_quality: int | None = None,
+        max_dimension: int | None = None
+    ):
         self.client = client
+        raw_q = jpeg_quality if jpeg_quality is not None else settings.JPEG_QUALITY
+        raw_dim = max_dimension if max_dimension is not None else settings.MAX_IMAGE_WIDTH
+        self.jpeg_quality = max(10, min(95, int(raw_q)))
+        self.max_dimension = max(300, min(2400, int(raw_dim)))
+
+    def _encode_rgb_jpeg(self, raw_bytes: bytes, quality: int | None = None, max_dim: int | None = None) -> bytes:
+        """
+        Converts raw image bytes into an RGB JPEG (preserving full color for Color E-Ink)
+        at the configured quality and maximum dimension.
+        """
+        q = quality if quality is not None else self.jpeg_quality
+        dim = max_dim if max_dim is not None else self.max_dimension
+
+        pil_img = Image.open(io.BytesIO(raw_bytes))
+
+        # Color Preservation: Handle RGBA / transparency
+        if pil_img.mode in ("RGBA", "LA") or (pil_img.mode == "P" and "transparency" in pil_img.info):
+            background = Image.new("RGB", pil_img.size, (255, 255, 255))
+            alpha = pil_img.convert("RGBA").split()[-1]
+            background.paste(pil_img.convert("RGB"), mask=alpha)
+            pil_img = background
+        elif pil_img.mode != "RGB":
+            pil_img = pil_img.convert("RGB")
+
+        # Downsample if oversized
+        pil_img.thumbnail((dim, dim), Image.Resampling.LANCZOS)
+
+        # Save as compressed RGB JPEG
+        buffer = io.BytesIO()
+        pil_img.save(buffer, format="JPEG", quality=q, optimize=True)
+        return buffer.getvalue()
 
     async def process_article_images(self, html_content: str, article_id: str, base_url: str = "") -> tuple[str, list[dict]]:
         """
         Parses <img> and <graphic> tags, downloads images, keeps RGB colors,
-        downscales to max 1600px, caches locally, and rewrites paths for EPUB.
+        downscales to configured max dimension, encodes at configured JPEG quality,
+        caches locally, and rewrites paths for EPUB.
         Returns: (updated_xhtml, list_of_image_manifest_items)
         """
         soup = BeautifulSoup(html_content, "html.parser")
@@ -66,7 +103,11 @@ class ImageProcessor:
             if src.startswith("images/") or src.startswith("images/art_"):
                 existing_file = settings.MEDIA_DIR / Path(src).name
                 if existing_file.exists():
-                    img_bytes = existing_file.read_bytes()
+                    raw_cached = existing_file.read_bytes()
+                    try:
+                        img_bytes = self._encode_rgb_jpeg(raw_cached)
+                    except Exception:
+                        img_bytes = raw_cached
                     img["src"] = epub_rel_path
                     img["alt"] = img.get("alt") or "Illustration"
                     images_manifest.append({
@@ -77,7 +118,11 @@ class ImageProcessor:
                     })
                     continue
                 elif target_cache_path.exists():
-                    img_bytes = target_cache_path.read_bytes()
+                    raw_cached = target_cache_path.read_bytes()
+                    try:
+                        img_bytes = self._encode_rgb_jpeg(raw_cached)
+                    except Exception:
+                        img_bytes = raw_cached
                     img["src"] = epub_rel_path
                     img["alt"] = img.get("alt") or "Illustration"
                     images_manifest.append({
@@ -108,7 +153,8 @@ class ImageProcessor:
             img_bytes: bytes | None = None
             if url_cache_path.exists():
                 try:
-                    img_bytes = url_cache_path.read_bytes()
+                    raw_cached = url_cache_path.read_bytes()
+                    img_bytes = self._encode_rgb_jpeg(raw_cached)
                 except Exception:
                     img_bytes = None
 
@@ -119,27 +165,16 @@ class ImageProcessor:
                         img.decompose()
                         continue
 
-                    pil_img = Image.open(io.BytesIO(resp.content))
+                    # Save master copy to persistent cache by URL hash
+                    master_bytes = self._encode_rgb_jpeg(
+                        resp.content,
+                        quality=max(self.jpeg_quality, settings.JPEG_QUALITY),
+                        max_dim=max(self.max_dimension, settings.MAX_IMAGE_WIDTH)
+                    )
+                    url_cache_path.write_bytes(master_bytes)
 
-                    # Color Preservation: Handle RGBA / transparency
-                    if pil_img.mode in ("RGBA", "LA") or (pil_img.mode == "P" and "transparency" in pil_img.info):
-                        background = Image.new("RGB", pil_img.size, (255, 255, 255))
-                        alpha = pil_img.convert("RGBA").split()[-1]
-                        background.paste(pil_img.convert("RGB"), mask=alpha)
-                        pil_img = background
-                    elif pil_img.mode != "RGB":
-                        pil_img = pil_img.convert("RGB")
-
-                    # Downsample if oversized
-                    pil_img.thumbnail((settings.MAX_IMAGE_WIDTH, settings.MAX_IMAGE_HEIGHT), Image.Resampling.LANCZOS)
-
-                    # Save as compressed RGB JPEG
-                    buffer = io.BytesIO()
-                    pil_img.save(buffer, format="JPEG", quality=settings.JPEG_QUALITY, optimize=True)
-                    img_bytes = buffer.getvalue()
-
-                    # Save to persistent cache by URL hash
-                    url_cache_path.write_bytes(img_bytes)
+                    # Encode at configured quality/dimension for the EPUB
+                    img_bytes = self._encode_rgb_jpeg(resp.content)
                 except Exception:
                     # If image fails to load or parse, cleanly remove it so it doesn't break EPUB rendering
                     img.decompose()

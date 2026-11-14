@@ -544,6 +544,61 @@
                     </div>
                 </div>
 
+                <!-- EPUB Image Quality & Compression Settings -->
+                <div class="glass-panel p-5 rounded-xl space-y-4">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                                <i data-lucide="image" class="w-4 h-4 text-cyan-400"></i> EPUB Image Quality &amp; Compression
+                            </h3>
+                            <p class="text-[11px] text-zinc-400 mt-0.5">Adjust RGB JPEG compression and max dimensions to keep EPUB file sizes within your SMTP server's byte limit.</p>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-lg bg-emerald-950/60 border border-emerald-800 text-emerald-300 font-mono text-[10px] shrink-0 self-start sm:self-auto">
+                            RGB Color E-Ink Preserved
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="p-3.5 rounded-xl bg-zinc-950/80 border border-zinc-800 space-y-2.5">
+                            <div class="flex items-center justify-between">
+                                <label for="cfg-jpeg-quality" class="text-[11px] font-mono text-zinc-300">JPEG Compression Quality (10–95)</label>
+                                <span id="cfg-jpeg-quality-badge" class="px-2 py-0.5 rounded bg-cyan-950/70 border border-cyan-800 text-cyan-300 font-mono text-xs font-bold">85%</span>
+                            </div>
+                            <input id="cfg-jpeg-quality" type="range" min="10" max="95" step="5" value="85" oninput="updateJpegQualityPreview(this.value)" class="w-full accent-cyan-400 cursor-pointer">
+                            <div class="flex items-center justify-between gap-1.5 pt-1 flex-wrap">
+                                <button type="button" onclick="setJpegQualityPreset(35, 1000)" class="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-cyan-300 text-[10px] font-mono transition-all">
+                                    Compact Mail (35%)
+                                </button>
+                                <button type="button" onclick="setJpegQualityPreset(60, 1200)" class="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-cyan-300 text-[10px] font-mono transition-all">
+                                    Balanced (60%)
+                                </button>
+                                <button type="button" onclick="setJpegQualityPreset(85, 1600)" class="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-cyan-300 text-[10px] font-mono transition-all">
+                                    High Default (85%)
+                                </button>
+                                <button type="button" onclick="setJpegQualityPreset(95, 2000)" class="px-2 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-cyan-300 text-[10px] font-mono transition-all">
+                                    Max (95%)
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="p-3.5 rounded-xl bg-zinc-950/80 border border-zinc-800 flex flex-col justify-between space-y-2">
+                            <div>
+                                <label for="cfg-max-image-width" class="text-[11px] font-mono text-zinc-300 block mb-1.5">Max Image Resolution (px)</label>
+                                <select id="cfg-max-image-width" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-cyan-500">
+                                    <option value="800">800 px (Ultra-Light Email / Small SMTP Limit)</option>
+                                    <option value="1000">1000 px (Compact E-Reader)</option>
+                                    <option value="1200">1200 px (Balanced HD)</option>
+                                    <option value="1600" selected>1600 px (Default E-Ink HD)</option>
+                                    <option value="2000">2000 px (Large Tablet / Ultra-HD)</option>
+                                </select>
+                            </div>
+                            <p class="text-[10px] font-mono text-zinc-500 leading-relaxed">
+                                Tip: Lowering quality (e.g. 35%–60%) shrinks image-heavy digests for both new EPUB builds and existing editions sent via SMTP.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- SMTP & Kindle Settings -->
                 <div class="glass-panel p-5 rounded-xl space-y-4">
                     <div class="flex items-center justify-between">

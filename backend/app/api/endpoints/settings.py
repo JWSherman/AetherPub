@@ -13,6 +13,8 @@ DEFAULT_SETTINGS = {
     "DAILY_CRON_HOUR": "6",
     "DAILY_CRON_MINUTE": "0",
     "DAILY_ARTICLE_LIMIT": "10",
+    "JPEG_QUALITY": "85",
+    "MAX_IMAGE_WIDTH": "1600",
     "AUTO_SEND_SMTP": "false",
     "DEFAULT_KINDLE_EMAIL": "",
     "SMTP_HOST": "",

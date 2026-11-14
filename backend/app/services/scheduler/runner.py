@@ -180,11 +180,25 @@ async def ingest_source(source_id: str):
 async def compile_daily_edition(limit: int | None = None) -> DailyEdition | None:
     """Compiles unbundled articles into a daily EPUB 3 edition."""
     async with AsyncSessionLocal() as session:
-        # Load daily limit from settings if not specified
+        # Load settings from DB
+        settings_res = await session.execute(select(Setting))
+        cfg_map = {s.key: s.value for s in settings_res.scalars().all()}
+
         if not limit:
-            limit_setting = await session.execute(select(Setting).where(Setting.key == "DAILY_ARTICLE_LIMIT"))
-            s_row = limit_setting.scalar_one_or_none()
-            limit = int(s_row.value) if s_row else settings.DAILY_ARTICLE_LIMIT
+            try:
+                limit = int(cfg_map.get("DAILY_ARTICLE_LIMIT") or settings.DAILY_ARTICLE_LIMIT)
+            except (ValueError, TypeError):
+                limit = settings.DAILY_ARTICLE_LIMIT
+
+        try:
+            jpeg_quality = int(cfg_map.get("JPEG_QUALITY") or settings.JPEG_QUALITY)
+        except (ValueError, TypeError):
+            jpeg_quality = settings.JPEG_QUALITY
+
+        try:
+            max_image_width = int(cfg_map.get("MAX_IMAGE_WIDTH") or settings.MAX_IMAGE_WIDTH)
+        except (ValueError, TypeError):
+            max_image_width = settings.MAX_IMAGE_WIDTH
 
         # Fetch top unbundled articles
         stmt = (
@@ -206,7 +220,11 @@ async def compile_daily_edition(limit: int | None = None) -> DailyEdition | None
         # Prepare payload for generator
         prepared_articles = []
         client = create_http_client()
-        image_processor = ImageProcessor(client)
+        image_processor = ImageProcessor(
+            client,
+            jpeg_quality=jpeg_quality,
+            max_dimension=max_image_width
+        )
 
         try:
             for art in articles:
@@ -282,21 +300,19 @@ async def compile_daily_edition(limit: int | None = None) -> DailyEdition | None
         })
 
         # Check for auto-send SMTP setting
-        auto_smtp_res = await session.execute(select(Setting).where(Setting.key == "AUTO_SEND_SMTP"))
-        auto_row = auto_smtp_res.scalar_one_or_none()
-        if auto_row and auto_row.value.lower() == "true":
-            kindle_res = await session.execute(select(Setting).where(Setting.key == "DEFAULT_KINDLE_EMAIL"))
-            k_row = kindle_res.scalar_one_or_none()
-            if k_row and k_row.value:
+        if cfg_map.get("AUTO_SEND_SMTP", "").lower() == "true":
+            target_email = cfg_map.get("DEFAULT_KINDLE_EMAIL", "")
+            if target_email:
                 try:
                     await SMTPDeliveryService.send_epub_email(
-                        recipient_email=k_row.value,
+                        recipient_email=target_email,
                         epub_path=out_path,
-                        edition_title=edition.title
+                        edition_title=edition.title,
+                        custom_config=cfg_map
                     )
                     edition.sent_via_smtp = True
                     await session.commit()
-                    await event_bus.emit("smtp:sent", {"recipient": k_row.value, "edition_id": edition.id})
+                    await event_bus.emit("smtp:sent", {"recipient": target_email, "edition_id": edition.id})
                 except Exception as e:
                     logger.error(f"Auto-send SMTP failed: {e}")
                     await event_bus.emit("smtp:failed", {"error": str(e)})
