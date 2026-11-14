@@ -495,17 +495,99 @@
         </section>
 
         <!-- TAB: INGESTED ARTICLES -->
-        <section id="tab-articles" class="tab-content hidden space-y-6">
+        <section id="tab-articles" class="tab-content hidden space-y-5">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-white/5">
                 <div>
-                    <h2 class="text-xl font-bold text-white">Ingested Articles Pool</h2>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i data-lucide="file-text" class="w-5 h-5 text-cyan-400"></i> Ingested Articles Pool
+                    </h2>
                     <p class="text-xs text-zinc-400 mt-0.5">Scored articles discovered from tracked sources, awaiting daily bundling.</p>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button onclick="fetchArticles()" class="px-3 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs font-mono flex items-center gap-1.5 transition-all" title="Refresh Ingested Articles">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-cyan-400"></i> Refresh
+                    </button>
                     <button id="btn-art-reset-bundled" onclick="resetBundledArticles()" class="px-3.5 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-amber-500/40 text-amber-300 hover:text-amber-200 text-xs font-mono flex items-center gap-1.5 transition-all" title="Unmark all previously bundled articles so a new digest can be compiled from a clean slate">
                         <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-amber-400"></i>
                         <span id="art-reset-bundled-label">Clear Bundled</span>
                     </button>
+                </div>
+            </div>
+
+            <!-- Articles Sorting & Filtering Toolbar -->
+            <div class="glass-panel p-3.5 rounded-xl space-y-3">
+                <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    <!-- Quick Sort Pills & Count -->
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="text-[11px] font-mono text-zinc-400 uppercase tracking-wider mr-1 flex items-center gap-1">
+                            <i data-lucide="arrow-up-down" class="w-3.5 h-3.5 text-cyan-400"></i> Sort:
+                        </span>
+                        <button type="button" data-sort-group="date" onclick="toggleArticleQuickSort('date')" class="art-sort-pill px-2.5 py-1 rounded-lg border text-xs font-mono flex items-center gap-1 transition-all bg-zinc-800 text-cyan-400 border-cyan-500/40">
+                            <i data-lucide="calendar" class="w-3 h-3"></i>
+                            <span>Date</span>
+                            <span class="art-sort-indicator text-[10px]">↓</span>
+                        </button>
+                        <button type="button" data-sort-group="score" onclick="toggleArticleQuickSort('score')" class="art-sort-pill px-2.5 py-1 rounded-lg border text-xs font-mono flex items-center gap-1 transition-all bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-zinc-200">
+                            <i data-lucide="sparkles" class="w-3 h-3"></i>
+                            <span>Score</span>
+                            <span class="art-sort-indicator text-[10px]"></span>
+                        </button>
+                        <button type="button" data-sort-group="words" onclick="toggleArticleQuickSort('words')" class="art-sort-pill px-2.5 py-1 rounded-lg border text-xs font-mono flex items-center gap-1 transition-all bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-zinc-200">
+                            <i data-lucide="book-open" class="w-3 h-3"></i>
+                            <span>Length</span>
+                            <span class="art-sort-indicator text-[10px]"></span>
+                        </button>
+                        <button type="button" data-sort-group="source" onclick="toggleArticleQuickSort('source')" class="art-sort-pill px-2.5 py-1 rounded-lg border text-xs font-mono flex items-center gap-1 transition-all bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-zinc-200">
+                            <i data-lucide="globe" class="w-3 h-3"></i>
+                            <span>Source</span>
+                            <span class="art-sort-indicator text-[10px]"></span>
+                        </button>
+                        <button type="button" data-sort-group="title" onclick="toggleArticleQuickSort('title')" class="art-sort-pill px-2.5 py-1 rounded-lg border text-xs font-mono flex items-center gap-1 transition-all bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-zinc-200">
+                            <i data-lucide="type" class="w-3 h-3"></i>
+                            <span>Title</span>
+                            <span class="art-sort-indicator text-[10px]"></span>
+                        </button>
+                        <button type="button" data-sort-group="status" onclick="toggleArticleQuickSort('status')" class="art-sort-pill px-2.5 py-1 rounded-lg border text-xs font-mono flex items-center gap-1 transition-all bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-zinc-200">
+                            <i data-lucide="package-check" class="w-3 h-3"></i>
+                            <span>Ready First</span>
+                            <span class="art-sort-indicator text-[10px]"></span>
+                        </button>
+                        <span id="art-showing-count" class="text-[11px] font-mono text-zinc-500 ml-1">0 articles</span>
+                    </div>
+
+                    <!-- Search, Filter & Detailed Sort Select -->
+                    <div class="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+                        <div class="relative flex-1 sm:w-52">
+                            <i data-lucide="search" class="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                            <input id="art-search-input" type="text" oninput="handleArticlesFilterChange()" placeholder="Search title, source, author..." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-500 font-mono transition-colors">
+                        </div>
+
+                        <select id="art-source-filter" onchange="handleArticlesFilterChange()" class="bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 font-mono focus:outline-none focus:border-cyan-500">
+                            <option value="">All Sources</option>
+                        </select>
+
+                        <select id="art-status-filter" onchange="handleArticlesFilterChange()" class="bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 font-mono focus:outline-none focus:border-cyan-500">
+                            <option value="all">All Statuses</option>
+                            <option value="unbundled">Ready to Bundle</option>
+                            <option value="bundled">Bundled</option>
+                        </select>
+
+                        <select id="art-sort-select" onchange="handleArticlesFilterChange()" class="bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 font-mono focus:outline-none focus:border-cyan-500">
+                            <option value="date_desc">Date: Newest First</option>
+                            <option value="date_asc">Date: Oldest First</option>
+                            <option value="ingested_desc">Ingested: Newest First</option>
+                            <option value="ingested_asc">Ingested: Oldest First</option>
+                            <option value="score_desc">Score: Highest First</option>
+                            <option value="score_asc">Score: Lowest First</option>
+                            <option value="words_desc">Length: Longest First</option>
+                            <option value="words_asc">Length: Shortest First</option>
+                            <option value="source_asc">Source: A → Z</option>
+                            <option value="source_desc">Source: Z → A</option>
+                            <option value="title_asc">Title: A → Z</option>
+                            <option value="title_desc">Title: Z → A</option>
+                            <option value="status_ready">Status: Ready First</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 

@@ -55,7 +55,11 @@ const state = {
     selectedEditions: new Set(),
     editionsSearchQuery: '',
     editionsSortBy: 'created_desc',
-    expandedDownloadHistory: new Set()
+    expandedDownloadHistory: new Set(),
+    articlesSearchQuery: '',
+    articlesSortBy: 'date_desc',
+    articlesSourceFilter: '',
+    articlesStatusFilter: 'all'
 };
 
 // --- Initialization ---
@@ -264,6 +268,7 @@ async function fetchSources() {
             renderSources();
             populateSandboxSources();
         }
+        populateArticleSourcesFilter();
         updateDashboardKPIs();
     } catch (e) {
         console.error('Failed to fetch sources:', e);
@@ -297,8 +302,10 @@ async function fetchCurves() {
 
 async function fetchArticles() {
     try {
-        const res = await fetch(`${API_BASE}/articles?limit=50`);
+        const sortParam = encodeURIComponent(state.articlesSortBy || 'date_desc');
+        const res = await fetch(`${API_BASE}/articles?limit=200&sort_by=${sortParam}`);
         state.articles = await res.json();
+        populateArticleSourcesFilter();
         if (state.currentTab === 'articles') renderArticles();
         updateDashboardKPIs();
     } catch (e) {
@@ -1586,33 +1593,229 @@ function renderDashboardEditions() {
     lucide.createIcons();
 }
 
+function populateArticleSourcesFilter() {
+    const select = document.getElementById('art-source-filter');
+    if (!select) return;
+
+    const currentVal = state.articlesSourceFilter || select.value || '';
+    const sourceMap = new Map();
+    state.sources.forEach(s => {
+        if (s && s.id) sourceMap.set(s.id, s.name || 'Web');
+    });
+    state.articles.forEach(a => {
+        if (a && a.source_id && !sourceMap.has(a.source_id)) {
+            sourceMap.set(a.source_id, a.source_name || 'Web');
+        }
+    });
+
+    const sortedSources = Array.from(sourceMap.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+    select.innerHTML = '<option value="">All Sources</option>' + sortedSources.map(([id, name]) =>
+        `<option value="${id}">${name}</option>`
+    ).join('');
+
+    if (currentVal && sourceMap.has(currentVal)) {
+        select.value = currentVal;
+    } else {
+        select.value = '';
+        state.articlesSourceFilter = '';
+    }
+}
+
+function handleArticlesFilterChange() {
+    const searchInput = document.getElementById('art-search-input');
+    const sourceFilter = document.getElementById('art-source-filter');
+    const statusFilter = document.getElementById('art-status-filter');
+    const sortSelect = document.getElementById('art-sort-select');
+
+    if (searchInput) state.articlesSearchQuery = searchInput.value.trim().toLowerCase();
+    if (sourceFilter) state.articlesSourceFilter = sourceFilter.value;
+    if (statusFilter) state.articlesStatusFilter = statusFilter.value;
+    if (sortSelect) state.articlesSortBy = sortSelect.value;
+
+    syncArticleSortControls();
+    renderArticles();
+}
+
+function toggleArticleQuickSort(group) {
+    const cur = state.articlesSortBy || 'date_desc';
+    const nextMap = {
+        date: cur === 'date_desc' ? 'date_asc' : 'date_desc',
+        score: cur === 'score_desc' ? 'score_asc' : 'score_desc',
+        words: cur === 'words_desc' ? 'words_asc' : 'words_desc',
+        source: cur === 'source_asc' ? 'source_desc' : 'source_asc',
+        title: cur === 'title_asc' ? 'title_desc' : 'title_asc',
+        status: 'status_ready'
+    };
+    state.articlesSortBy = nextMap[group] || 'date_desc';
+    const sortSelect = document.getElementById('art-sort-select');
+    if (sortSelect) sortSelect.value = state.articlesSortBy;
+    syncArticleSortControls();
+    renderArticles();
+}
+
+function syncArticleSortControls() {
+    const sortMode = state.articlesSortBy || 'date_desc';
+    const sortSelect = document.getElementById('art-sort-select');
+    if (sortSelect && sortSelect.value !== sortMode) {
+        sortSelect.value = sortMode;
+    }
+
+    const activeGroupMap = {
+        date_desc: { group: 'date', dir: '↓' },
+        date_asc: { group: 'date', dir: '↑' },
+        ingested_desc: { group: 'date', dir: '↓' },
+        ingested_asc: { group: 'date', dir: '↑' },
+        score_desc: { group: 'score', dir: '↓' },
+        score_asc: { group: 'score', dir: '↑' },
+        words_desc: { group: 'words', dir: '↓' },
+        words_asc: { group: 'words', dir: '↑' },
+        source_asc: { group: 'source', dir: '↑' },
+        source_desc: { group: 'source', dir: '↓' },
+        title_asc: { group: 'title', dir: '↑' },
+        title_desc: { group: 'title', dir: '↓' },
+        status_ready: { group: 'status', dir: '✓' }
+    };
+    const activeInfo = activeGroupMap[sortMode] || { group: 'date', dir: '↓' };
+
+    document.querySelectorAll('.art-sort-pill').forEach(btn => {
+        const g = btn.dataset.sortGroup;
+        const indicator = btn.querySelector('.art-sort-indicator');
+        if (g === activeInfo.group) {
+            btn.className = 'art-sort-pill px-2.5 py-1 rounded-lg border text-xs font-mono flex items-center gap-1 transition-all bg-zinc-800 text-cyan-400 border-cyan-500/40';
+            if (indicator) indicator.textContent = activeInfo.dir;
+        } else {
+            btn.className = 'art-sort-pill px-2.5 py-1 rounded-lg border text-xs font-mono flex items-center gap-1 transition-all bg-zinc-900 text-zinc-400 border-zinc-700 hover:text-zinc-200';
+            if (indicator) indicator.textContent = '';
+        }
+    });
+}
+
+function getFilteredAndSortedArticles() {
+    const q = state.articlesSearchQuery || '';
+    const srcFilter = state.articlesSourceFilter || '';
+    const statusFilter = state.articlesStatusFilter || 'all';
+
+    const filtered = state.articles.filter(art => {
+        if (srcFilter && art.source_id !== srcFilter) return false;
+        if (statusFilter === 'unbundled' && art.is_bundled) return false;
+        if (statusFilter === 'bundled' && !art.is_bundled) return false;
+        if (!q) return true;
+
+        const title = (art.title || '').toLowerCase();
+        const excerpt = (art.excerpt || '').toLowerCase();
+        const source = (art.source_name || '').toLowerCase();
+        const author = (art.author || '').toLowerCase();
+        return title.includes(q) || excerpt.includes(q) || source.includes(q) || author.includes(q);
+    });
+
+    const sortMode = state.articlesSortBy || 'date_desc';
+    filtered.sort((a, b) => {
+        const pubA = parseIsoTimestamp(a.published_at || a.created_at)?.getTime() || 0;
+        const pubB = parseIsoTimestamp(b.published_at || b.created_at)?.getTime() || 0;
+        const ingA = parseIsoTimestamp(a.created_at)?.getTime() || 0;
+        const ingB = parseIsoTimestamp(b.created_at)?.getTime() || 0;
+        const scoreA = Number(a.relevance_score) || 0;
+        const scoreB = Number(b.relevance_score) || 0;
+        const wordsA = Number(a.word_count) || 0;
+        const wordsB = Number(b.word_count) || 0;
+        const titleA = (a.title || '').toLowerCase();
+        const titleB = (b.title || '').toLowerCase();
+        const srcA = (a.source_name || '').toLowerCase();
+        const srcB = (b.source_name || '').toLowerCase();
+
+        switch (sortMode) {
+            case 'date_asc':
+                return pubA - pubB || ingA - ingB;
+            case 'ingested_desc':
+                return ingB - ingA;
+            case 'ingested_asc':
+                return ingA - ingB;
+            case 'score_desc':
+                return scoreB - scoreA || pubB - pubA;
+            case 'score_asc':
+                return scoreA - scoreB || pubB - pubA;
+            case 'words_desc':
+                return wordsB - wordsA || pubB - pubA;
+            case 'words_asc':
+                return wordsA - wordsB || pubB - pubA;
+            case 'source_asc':
+                return srcA.localeCompare(srcB) || pubB - pubA;
+            case 'source_desc':
+                return srcB.localeCompare(srcA) || pubB - pubA;
+            case 'title_asc':
+                return titleA.localeCompare(titleB) || pubB - pubA;
+            case 'title_desc':
+                return titleB.localeCompare(titleA) || pubB - pubA;
+            case 'status_ready':
+                return (Number(a.is_bundled) - Number(b.is_bundled)) || (scoreB - scoreA) || (pubB - pubA);
+            case 'date_desc':
+            default:
+                return pubB - pubA || ingB - ingA;
+        }
+    });
+
+    return filtered;
+}
+
 function renderArticles() {
     const container = document.getElementById('articles-list');
+    const showingCountEl = document.getElementById('art-showing-count');
     if (!container) return;
 
-    if (state.articles.length === 0) {
+    populateArticleSourcesFilter();
+    syncArticleSortControls();
+
+    const totalCount = state.articles.length;
+    if (totalCount === 0) {
+        if (showingCountEl) showingCountEl.textContent = '0 articles';
         container.innerHTML = `
             <div class="py-16 text-center border border-dashed border-zinc-800 rounded-xl bg-zinc-950/40">
+                <i data-lucide="file-text" class="w-10 h-10 text-zinc-600 mx-auto mb-3"></i>
                 <p class="text-zinc-400 font-medium">No articles ingested yet</p>
-                <p class="text-zinc-600 text-sm mt-1">Trigger a crawl on one of your sources to pull in recent posts.</p>
+                <p class="text-zinc-600 text-xs font-mono mt-1">Trigger a crawl on one of your sources to pull in recent posts.</p>
             </div>
         `;
+        lucide.createIcons();
         return;
     }
 
-    container.innerHTML = state.articles.map(art => {
+    const filtered = getFilteredAndSortedArticles();
+    if (showingCountEl) {
+        showingCountEl.textContent = filtered.length === totalCount
+            ? `${totalCount} ${totalCount === 1 ? 'article' : 'articles'}`
+            : `Showing ${filtered.length} of ${totalCount} articles`;
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = `
+            <div class="py-12 text-center border border-dashed border-zinc-800 rounded-xl bg-zinc-950/40">
+                <i data-lucide="search-x" class="w-8 h-8 text-zinc-600 mx-auto mb-2"></i>
+                <p class="text-zinc-400 text-xs font-mono">No ingested articles match the active search or filters.</p>
+            </div>
+        `;
+        lucide.createIcons();
+        return;
+    }
+
+    container.innerHTML = filtered.map(art => {
+        const scoreVal = Number(art.relevance_score) || 0;
+        const scoreColor = scoreVal >= 5 ? 'text-cyan-400' : (scoreVal > 0 ? 'text-white' : 'text-zinc-400');
+        const pubDateStr = (art.published_at || art.created_at)
+            ? new Date(art.published_at || art.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })
+            : '';
+
         return `
             <div class="glass-panel p-4 rounded-xl flex items-start justify-between gap-4 border border-zinc-800/80 hover:border-cyan-500/30 transition-all">
-                <div class="flex-1">
-                    <div class="flex items-center gap-2">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
                         <span class="px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-[11px] font-mono text-cyan-400">
                             ${art.source_name || 'Web'}
                         </span>
-                        <span class="px-2 py-0.5 rounded ${art.is_bundled ? 'bg-zinc-800 text-zinc-400' : 'bg-violet-950/60 text-violet-300 border border-violet-800'} text-[11px] font-mono">
+                        <span class="px-2 py-0.5 rounded ${art.is_bundled ? 'bg-zinc-800 text-zinc-400 border border-zinc-700' : 'bg-violet-950/60 text-violet-300 border border-violet-800'} text-[11px] font-mono">
                             ${art.is_bundled ? 'Bundled' : 'Ready for Daily Edition'}
                         </span>
-                        <span class="text-xs font-mono text-zinc-400 ml-auto">
-                            Score: <strong class="text-white">${art.relevance_score}</strong>
+                        <span class="px-2.5 py-0.5 rounded-lg bg-zinc-950/90 border border-zinc-800 text-xs font-mono text-zinc-400 ml-auto">
+                            Score: <strong class="${scoreColor}">${art.relevance_score}</strong>
                         </span>
                     </div>
 
@@ -1622,16 +1825,18 @@ function renderArticles() {
 
                     ${art.excerpt ? `<p class="text-xs text-zinc-400 mt-1 line-clamp-2">${art.excerpt}</p>` : ''}
 
-                    <div class="mt-3 flex items-center gap-4 text-[11px] text-zinc-500 font-mono">
-                        ${(art.published_at || art.created_at) ? `<span>${new Date(art.published_at || art.created_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>` : ''}
-                        <span>~${Math.max(1, Math.round(art.word_count / 220))} min read</span>
-                        <span>${art.word_count} words</span>
+                    <div class="mt-3 flex items-center gap-4 flex-wrap text-[11px] text-zinc-500 font-mono">
+                        ${pubDateStr ? `<span class="flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3 text-zinc-600"></i> ${pubDateStr}</span>` : ''}
+                        <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3 text-zinc-600"></i> ~${Math.max(1, Math.round(art.word_count / 220))} min read</span>
+                        <span>${(art.word_count || 0).toLocaleString()} words</span>
                         ${art.author ? `<span>Author: ${art.author}</span>` : ''}
                     </div>
                 </div>
             </div>
         `;
     }).join('');
+
+    lucide.createIcons();
 }
 
 // --- Action Triggers ---

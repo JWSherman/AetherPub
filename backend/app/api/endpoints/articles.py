@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, asc, func
 from sqlalchemy.orm import defer
 from backend.app.core.database import get_db
 from backend.app.core.event_bus import event_bus
@@ -34,14 +34,32 @@ async def reset_bundled_articles(db: AsyncSession = Depends(get_db)):
 async def list_articles(
     source_id: str | None = None,
     unbundled_only: bool = False,
-    limit: int = Query(default=50, le=200),
+    sort_by: str = Query(default="date_desc"),
+    limit: int = Query(default=100, le=500),
     db: AsyncSession = Depends(get_db)
 ):
+    effective_date = func.coalesce(Article.published_at, Article.created_at)
+    order_clauses = {
+        "date_desc": (desc(effective_date), desc(Article.created_at)),
+        "date_asc": (asc(effective_date), asc(Article.created_at)),
+        "ingested_desc": (desc(Article.created_at),),
+        "ingested_asc": (asc(Article.created_at),),
+        "score_desc": (desc(Article.relevance_score), desc(effective_date)),
+        "score_asc": (asc(Article.relevance_score), desc(effective_date)),
+        "words_desc": (desc(Article.word_count), desc(effective_date)),
+        "words_asc": (asc(Article.word_count), desc(effective_date)),
+        "title_asc": (asc(func.lower(Article.title)), desc(effective_date)),
+        "title_desc": (desc(func.lower(Article.title)), desc(effective_date)),
+        "source_asc": (asc(func.lower(Source.name)), desc(effective_date)),
+        "source_desc": (desc(func.lower(Source.name)), desc(effective_date)),
+        "status_ready": (asc(Article.is_bundled), desc(Article.relevance_score), desc(effective_date)),
+    }.get(sort_by, (desc(effective_date), desc(Article.created_at)))
+
     stmt = (
         select(Article, Source.name.label("source_name"))
         .options(defer(Article.clean_html), defer(Article.plain_text))
         .join(Source, Source.id == Article.source_id)
-        .order_by(desc(Article.created_at))
+        .order_by(*order_clauses)
     )
     if source_id:
         stmt = stmt.where(Article.source_id == source_id)

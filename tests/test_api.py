@@ -288,3 +288,83 @@ async def test_image_quality_settings_and_epub_recompression():
         re_img = Image.open(io.BytesIO(zf.read("EPUB/images/sample.jpg")))
         assert re_img.mode == "RGB"
         assert max(re_img.size) <= 800
+
+@pytest.mark.asyncio
+async def test_articles_sorting_options():
+    import uuid
+    from datetime import datetime, timezone, timedelta
+    from backend.app.core.database import AsyncSessionLocal
+    from backend.app.models.entities import Source, Article
+
+    await init_db()
+    now = datetime.now(timezone.utc)
+
+    async with AsyncSessionLocal() as session:
+        src = Source(
+            name="Test Sorting Source",
+            base_url=f"https://example.com/{uuid.uuid4().hex[:8]}",
+            crawl_mode="rss"
+        )
+        session.add(src)
+        await session.flush()
+
+        art_alpha = Article(
+            source_id=src.id,
+            url=f"https://example.com/alpha-{uuid.uuid4().hex[:8]}",
+            title="Alpha Article",
+            published_at=now - timedelta(days=3),
+            clean_html="<div class='article-content'><p>Alpha</p></div>",
+            plain_text="Alpha",
+            word_count=300,
+            content_hash=uuid.uuid4().hex[:16],
+            relevance_score=9.5,
+            is_bundled=True
+        )
+        art_zeta = Article(
+            source_id=src.id,
+            url=f"https://example.com/zeta-{uuid.uuid4().hex[:8]}",
+            title="Zeta Article",
+            published_at=now - timedelta(days=1),
+            clean_html="<div class='article-content'><p>Zeta</p></div>",
+            plain_text="Zeta",
+            word_count=1800,
+            content_hash=uuid.uuid4().hex[:16],
+            relevance_score=2.0,
+            is_bundled=False
+        )
+        session.add_all([art_alpha, art_zeta])
+        await session.commit()
+        src_id = src.id
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # Sort by score descending
+        score_desc = (await ac.get(f"/api/v1/articles?source_id={src_id}&sort_by=score_desc")).json()
+        assert [a["title"] for a in score_desc] == ["Alpha Article", "Zeta Article"]
+
+        # Sort by score ascending
+        score_asc = (await ac.get(f"/api/v1/articles?source_id={src_id}&sort_by=score_asc")).json()
+        assert [a["title"] for a in score_asc] == ["Zeta Article", "Alpha Article"]
+
+        # Sort by date descending (newest first)
+        date_desc = (await ac.get(f"/api/v1/articles?source_id={src_id}&sort_by=date_desc")).json()
+        assert [a["title"] for a in date_desc] == ["Zeta Article", "Alpha Article"]
+
+        # Sort by date ascending (oldest first)
+        date_asc = (await ac.get(f"/api/v1/articles?source_id={src_id}&sort_by=date_asc")).json()
+        assert [a["title"] for a in date_asc] == ["Alpha Article", "Zeta Article"]
+
+        # Sort by word count descending
+        words_desc = (await ac.get(f"/api/v1/articles?source_id={src_id}&sort_by=words_desc")).json()
+        assert [a["title"] for a in words_desc] == ["Zeta Article", "Alpha Article"]
+
+        # Sort by title A-Z
+        title_asc = (await ac.get(f"/api/v1/articles?source_id={src_id}&sort_by=title_asc")).json()
+        assert [a["title"] for a in title_asc] == ["Alpha Article", "Zeta Article"]
+
+        # Sort by status ready first (unbundled first)
+        status_ready = (await ac.get(f"/api/v1/articles?source_id={src_id}&sort_by=status_ready")).json()
+        assert [a["title"] for a in status_ready] == ["Zeta Article", "Alpha Article"]
+
+        # Cleanup
+        await ac.delete(f"/api/v1/sources/{src_id}")
