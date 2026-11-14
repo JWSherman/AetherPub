@@ -24,6 +24,7 @@ class Source(Base):
     feed_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     crawl_mode: Mapped[str] = mapped_column(String(50), default="auto")  # auto, rss, sitemap, html
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    weight: Mapped[float] = mapped_column(Float, default=0.0)
     last_crawled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_status: Mapped[str] = mapped_column(String(50), default="idle")  # idle, crawling, success, error
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -46,7 +47,7 @@ class Article(Base):
     __tablename__ = "articles"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    source_id: Mapped[str] = mapped_column(String(36), ForeignKey("sources.id", ondelete="CASCADE"), nullable=False)
+    source_id: Mapped[str] = mapped_column(String(36), ForeignKey("sources.id", ondelete="CASCADE"), nullable=False, index=True)
     url: Mapped[str] = mapped_column(String(2048), unique=True, index=True, nullable=False)
     title: Mapped[str] = mapped_column(String(512), nullable=False)
     author: Mapped[str | None] = mapped_column(String(255), nullable=True)

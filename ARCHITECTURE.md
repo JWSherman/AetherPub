@@ -149,8 +149,13 @@ agyplayground/
   - Rewrites `img src` to relative internal EPUB paths (`images/art_{id}_{index}.jpg`).
 
 ### 4.2 Curation & Scoring Matrix (`services/curator/`)
-- **Scoring Formula**:
-  $$\text{Score} = \sum_{k \in \text{Weighted Keywords}} k.\text{weight} \times \left(3.0 \times \text{TitleHits}(k) + 1.0 \times \text{BodyHits}(k)\right)$$
+- **Composite Scoring Formula**:
+  $$\text{Score} = \max\left(0.0, \text{Score}_{\text{keywords}} + \text{Weight}_{\text{source}} + \text{Weight}_{\text{age}}(d) + \text{Weight}_{\text{length}}(w)\right)$$
+  Where:
+  $$\text{Score}_{\text{keywords}} = \sum_{k \in \text{Weighted Keywords}} k.\text{weight} \times \left(3.0 \times \text{TitleHits}(k) + 1.0 \times \text{BodyHits}(k)\right)$$
+  - $\text{Weight}_{\text{source}}$: Source-level bias applied to all articles from the feed.
+  - $\text{Weight}_{\text{age}}(d)$: Piecewise linear interpolation of user-defined age curve (days).
+  - $\text{Weight}_{\text{length}}(w)$: Piecewise linear interpolation of user-defined article length curve (words).
 - **Exclusion Check (`is_excluded=True`)**:
   - If any excluded keyword matches title or body, score is set to `-1.0` and the article is immediately discarded.
 - **Required Check (`is_required=True`)**:

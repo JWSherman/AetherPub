@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
+from sqlalchemy.orm import defer
 from backend.app.core.database import get_db
 from backend.app.models.entities import Article, Source
 from backend.app.schemas.api_models import ArticleResponse
@@ -16,6 +17,7 @@ async def list_articles(
 ):
     stmt = (
         select(Article, Source.name.label("source_name"))
+        .options(defer(Article.clean_html), defer(Article.plain_text))
         .join(Source, Source.id == Article.source_id)
         .order_by(desc(Article.created_at))
     )

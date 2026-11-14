@@ -1,5 +1,6 @@
 import asyncio
 import re
+import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,7 +14,7 @@ from backend.app.services.crawler.fetcher import create_http_client, polite_dela
 from backend.app.services.crawler.discovery import DiscoveryService
 from backend.app.services.extractor.readability import ReadabilityService
 from backend.app.services.extractor.image_processor import ImageProcessor
-from backend.app.services.curator.scorer import KeywordScorer
+from backend.app.services.curator.scorer import KeywordScorer, DEFAULT_AGE_CURVE, DEFAULT_LENGTH_CURVE
 from backend.app.services.curator.simhash import are_near_duplicates
 from backend.app.services.epub.generator import EPUBGenerator
 from backend.app.services.delivery.smtp_client import SMTPDeliveryService
@@ -37,6 +38,21 @@ async def ingest_source(source_id: str):
         # Fetch active keywords
         kw_res = await session.execute(select(Keyword))
         keywords = kw_res.scalars().all()
+
+        # Load scoring curves
+        age_setting = await session.execute(select(Setting.value).where(Setting.key == "WEIGHT_CURVE_AGE"))
+        age_val = age_setting.scalar_one_or_none()
+        try:
+            age_curve = json.loads(age_val) if age_val else DEFAULT_AGE_CURVE
+        except Exception:
+            age_curve = DEFAULT_AGE_CURVE
+
+        len_setting = await session.execute(select(Setting.value).where(Setting.key == "WEIGHT_CURVE_LENGTH"))
+        len_val = len_setting.scalar_one_or_none()
+        try:
+            len_curve = json.loads(len_val) if len_val else DEFAULT_LENGTH_CURVE
+        except Exception:
+            len_curve = DEFAULT_LENGTH_CURVE
 
         # Fetch existing URLs and SimHashes for deduplication
         art_res = await session.execute(select(Article.url, Article.content_hash))
@@ -77,12 +93,6 @@ async def ingest_source(source_id: str):
                     if is_dup:
                         continue
 
-                    # Score article against active keywords
-                    score = KeywordScorer.score_article(extracted["title"], extracted["plain_text"], keywords)
-                    if score < 0:
-                        # Excluded by keyword
-                        continue
-
                     pub_dt = None
                     raw_pub = extracted.get("published_at") or item.get("published")
                     if raw_pub:
@@ -104,6 +114,21 @@ async def ingest_source(source_id: str):
                                 pub_dt = None
                     if not pub_dt:
                         pub_dt = datetime.now(timezone.utc)
+
+                    # Score article against active keywords, source weight, age curve, and length curve
+                    score = KeywordScorer.score_article(
+                        title=extracted["title"],
+                        text=extracted["plain_text"],
+                        keywords=keywords,
+                        source_weight=source.weight,
+                        published_at=pub_dt,
+                        word_count=extracted["word_count"],
+                        age_curve=age_curve,
+                        length_curve=len_curve
+                    )
+                    if score < 0:
+                        # Excluded by keyword
+                        continue
 
                     new_article = Article(
                         source_id=source.id,

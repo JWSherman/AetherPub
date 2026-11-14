@@ -71,9 +71,23 @@ async def sanitize_legacy_articles():
 
         await session.commit()
 
+from sqlalchemy import text
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+        def migrate_schema(sync_conn):
+            try:
+                res = sync_conn.execute(text("PRAGMA table_info(sources)"))
+                columns = [row[1] for row in res.fetchall()]
+                if columns and "weight" not in columns:
+                    sync_conn.execute(text("ALTER TABLE sources ADD COLUMN weight FLOAT DEFAULT 0.0"))
+            except Exception:
+                pass
+
+        await conn.run_sync(migrate_schema)
+
     try:
         await sanitize_legacy_articles()
     except Exception:

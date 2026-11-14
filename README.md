@@ -36,12 +36,14 @@ Reading long-form technical articles, newsletters, and blogs on computer monitor
 - **Full RGB Color Preservation**: Extracted photos, diagrams, and infographics retain their original RGB color channels for modern color e-ink devices (**Kindle Colorsoft, Kobo Clara Colour, reMarkable Paper Pro, Boox Palma/Tab**) and tablets.
 - **Adaptive Downscaling**: High-resolution imagery is gracefully resized to max 1600px JPEG (quality 85) to ensure rapid e-reader page turns and compact file sizes.
 
-### 🎯 Intelligent Keyword & Topic Curation
-- **Weighted Scoring**: Set custom weights on topics you care about. Matches in article titles receive a $3\times$ boost over body text.
-- **Required Keywords (`+keyword`)**: Guarantee that only articles containing mandatory tags are considered.
-- **Excluded Keywords (`-keyword`)**: Instantly discard articles matching clickbait or uninteresting topics.
+### 🎯 Multi-Dimensional Curation & Scoring Weights
+- **Source-Level Priority Weights**: Assign a custom positive or negative score bias directly to individual feeds and sources to prioritize trusted publications.
+- **Informational Keyword Matrix**: Easily view and adjust multipliers inline on active keyword rules, required anchors, and exclusion filters.
+- **Interactive Article Age Curve**: Graphically shape article recency decay using interactive SVG control points ($X = \text{Age in Days}, Y = \text{Score Bias}$).
+- **Interactive Article Length Curve**: Shape preferred reading lengths with interactive points ($X = \text{Word Count}, Y = \text{Score Bias}$) to favor sweet-spot longform essays over stubs or excessive tomes.
 - **SimHash 64-bit Deduplication**: Prevents cross-posted or syndicated articles across aggregators from appearing twice.
-- **Interactive Scoring Sandbox**: Test your keyword scoring rules against sample URLs or text snippets before adding them.
+- **Interactive Scoring Sandbox**: Test your keyword rules, source weights, and dynamic curves against sample URLs or text before activating them.
+- **One-Click Recalculate**: Instantly re-score all unbundled articles when rules or curve control points are updated.
 
 ### 📚 IDPF EPUB 3.2 Standard Compliance
 - **Procedural Cover Art**: Pillow procedurally generates a bespoke, high-resolution ($1600 \times 2400$) cover image for every daily edition with date emblems and topic summaries.
@@ -90,7 +92,7 @@ Interactive Swagger API docs are available at: **[http://127.0.0.1:8000/docs](ht
 ┌────────────────────────────────────────────────────────────────────────┐
 │ ⚡ AETHERPUB                      ● System Active (Idle)   [Compile]   │
 ├────────────────────────────────────────────────────────────────────────┤
-│ [Overview]  [Website Sources]  [Keyword Matrix]  [Daily Digests] [...] │
+│ [Overview]  [Curation & Weights]  [Daily Digests]  [Ingested] [Settings] │
 ├────────────────────────────────────────────────────────────────────────┤
 │                                                                        │
 │  Tracked Sources   Active Keywords   Ready to Bundle   Total Digests   │

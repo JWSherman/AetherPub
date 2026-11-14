@@ -76,11 +76,8 @@
             <button data-tab="dashboard" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-2 border bg-zinc-800 text-cyan-400 border-cyan-500/40 transition-all">
                 <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Overview
             </button>
-            <button data-tab="sources" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-2 border border-transparent text-zinc-400 hover:text-zinc-200 transition-all">
-                <i data-lucide="globe" class="w-4 h-4"></i> Website Sources
-            </button>
-            <button data-tab="keywords" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-2 border border-transparent text-zinc-400 hover:text-zinc-200 transition-all">
-                <i data-lucide="sliders" class="w-4 h-4"></i> Keyword Matrix
+            <button data-tab="curation" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-2 border border-transparent text-zinc-400 hover:text-zinc-200 transition-all">
+                <i data-lucide="sliders" class="w-4 h-4"></i> Curation & Weights
             </button>
             <button data-tab="editions" class="nav-btn px-3 py-1.5 rounded-lg text-xs font-mono font-medium flex items-center gap-2 border border-transparent text-zinc-400 hover:text-zinc-200 transition-all">
                 <i data-lucide="library" class="w-4 h-4"></i> Daily Digests
@@ -152,89 +149,215 @@
             </div>
         </section>
 
-        <!-- TAB: WEBSITE SOURCES -->
-        <section id="tab-sources" class="tab-content hidden space-y-6">
-            <div class="flex items-center justify-between">
+        <!-- TAB: CURATION & WEIGHTS MATRIX -->
+        <section id="tab-curation" class="tab-content hidden space-y-8">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-white/5">
                 <div>
-                    <h2 class="text-xl font-bold text-white">Monitored Website Repositories</h2>
-                    <p class="text-xs text-zinc-400 mt-0.5">Manage URLs, RSS feeds, and automated crawler behavior.</p>
+                    <h2 class="text-xl font-bold text-white flex items-center gap-2">
+                        <i data-lucide="sliders" class="w-5 h-5 text-cyan-400"></i> Curation & Scoring Weights
+                    </h2>
+                    <p class="text-xs text-zinc-400 mt-0.5">Manage source feeds, keyword multipliers, article age decay, and reading length curves.</p>
                 </div>
-                <button id="btn-open-add-source" class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs flex items-center gap-1.5 transition-all shadow-lg shadow-cyan-500/20">
-                    <i data-lucide="plus" class="w-4 h-4"></i> Add Website
-                </button>
+                <div class="flex items-center gap-2">
+                    <button id="btn-recalculate-scores" class="px-3.5 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-violet-500/40 text-violet-300 hover:text-white text-xs font-mono flex items-center gap-1.5 transition-all shadow-sm">
+                        <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-violet-400"></i> Recalculate Scores
+                    </button>
+                    <button id="btn-open-add-source" class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs flex items-center gap-1.5 transition-all shadow-lg shadow-cyan-500/20">
+                        <i data-lucide="plus" class="w-4 h-4"></i> Add Website
+                    </button>
+                </div>
             </div>
 
-            <!-- Sources Grid -->
-            <div id="sources-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <!-- Dynamically rendered -->
-            </div>
-        </section>
-
-        <!-- TAB: KEYWORDS & INTEREST MATRIX -->
-        <section id="tab-keywords" class="tab-content hidden space-y-8">
-            <div>
-                <h2 class="text-xl font-bold text-white">Keyword Curation Matrix</h2>
-                <p class="text-xs text-zinc-400 mt-0.5">Define topics, positive/negative weights, and required terms to score articles.</p>
-            </div>
-
-            <!-- Add Keyword Card -->
-            <div class="glass-panel p-5 rounded-xl">
-                <h3 class="text-sm font-semibold text-white mb-3">Add / Adjust Keyword Rule</h3>
-                <form id="keyword-form" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                    <div class="sm:col-span-2">
-                        <label class="text-[11px] font-mono text-zinc-400 block mb-1">Term or Phrase</label>
-                        <input id="kw-term-input" type="text" placeholder="e.g. artificial intelligence, rust, kindle" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500" required>
-                    </div>
+            <!-- SECTION 1: SOURCES & SOURCE WEIGHTS -->
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
                     <div>
-                        <label class="text-[11px] font-mono text-zinc-400 block mb-1">Rule Type</label>
-                        <select id="kw-type-select" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
-                            <option value="weighted">Weighted Interest</option>
-                            <option value="required">[+] Required (Must be present)</option>
-                            <option value="excluded">[-] Excluded (Discard immediately)</option>
-                        </select>
+                        <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                            <i data-lucide="globe" class="w-4 h-4 text-cyan-400"></i> Website Sources & Priority Bias
+                        </h3>
+                        <p class="text-xs text-zinc-400 mt-0.5">Assign a positive or negative score bias directly to sources so all their articles rank higher or lower.</p>
                     </div>
-                    <div>
-                        <label class="text-[11px] font-mono text-zinc-400 block mb-1">Weight Multiplier (-5 to +5)</label>
+                </div>
+
+                <!-- Sources Grid -->
+                <div id="sources-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Dynamically rendered -->
+                </div>
+            </div>
+
+            <!-- SECTION 2: KEYWORDS & INFORMATIONAL RULES TABLE -->
+            <div class="space-y-4">
+                <div>
+                    <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                        <i data-lucide="tag" class="w-4 h-4 text-violet-400"></i> Keyword Interest Matrix
+                    </h3>
+                    <p class="text-xs text-zinc-400 mt-0.5">Configure term multipliers, required anchors, and exclusion filters.</p>
+                </div>
+
+                <!-- Add Keyword Card -->
+                <div class="glass-panel p-5 rounded-xl">
+                    <h4 class="text-xs font-mono uppercase tracking-wider text-zinc-300 mb-3">Add New Keyword Rule</h4>
+                    <form id="keyword-form" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                        <div class="sm:col-span-2">
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">Term or Phrase</label>
+                            <input id="kw-term-input" type="text" placeholder="e.g. artificial intelligence, rust, kindle" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500" required>
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">Rule Type</label>
+                            <select id="kw-type-select" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                                <option value="weighted">Weighted Interest</option>
+                                <option value="required">[+] Required (Must be present)</option>
+                                <option value="excluded">[-] Excluded (Discard immediately)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">Weight Multiplier (-10 to +10)</label>
+                            <div class="flex items-center gap-2">
+                                <input id="kw-weight-input" type="number" step="0.5" value="1.0" min="-10" max="10" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                                <button type="submit" class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs whitespace-nowrap">
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Active Keywords Informational Table / List -->
+                <div class="glass-panel rounded-xl overflow-hidden border border-white/10">
+                    <div class="px-4 py-3 bg-zinc-900/80 border-b border-zinc-800 flex items-center justify-between">
                         <div class="flex items-center gap-2">
-                            <input id="kw-weight-input" type="number" step="0.5" value="1.0" min="-5" max="10" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
-                            <button type="submit" class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs whitespace-nowrap">
-                                Save
-                            </button>
+                            <span class="text-xs font-mono font-semibold text-zinc-300">ACTIVE KEYWORD RULES</span>
+                            <span id="kw-count-badge" class="px-2 py-0.5 rounded-full bg-zinc-800 text-[10px] font-mono text-zinc-400">0 rules</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs font-mono">
+                            <span class="text-zinc-500 text-[11px]">Directly edit weights below</span>
                         </div>
                     </div>
-                </form>
-            </div>
-
-            <!-- Active Keywords Chips Grid -->
-            <div>
-                <h3 class="text-sm font-semibold text-white mb-3">Active Rules</h3>
-                <div id="keywords-list">
-                    <!-- Populated by JS -->
+                    <div id="keywords-list" class="divide-y divide-zinc-800/80">
+                        <!-- Populated by JS in informational layout with inline editable weights -->
+                    </div>
                 </div>
             </div>
 
-            <!-- Interactive Keyword Sandbox -->
+            <!-- SECTION 3: DYNAMIC WEIGHTING CURVES (AGE & LENGTH) -->
+            <div class="space-y-4">
+                <div>
+                    <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+                        <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i> Dynamic Dimension Curves
+                    </h3>
+                    <p class="text-xs text-zinc-400 mt-0.5">Drag control points or enter values to shape how article recency and length bias the curation score.</p>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <!-- Article Age Graph -->
+                    <div class="glass-panel p-5 rounded-xl space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="text-sm font-semibold text-white flex items-center gap-2">
+                                    <i data-lucide="clock" class="w-4 h-4 text-cyan-400"></i> Article Age Weighting Curve
+                                </h4>
+                                <p class="text-[11px] text-zinc-400 mt-0.5">X: Age in Days &bull; Y: Score Bias (-10 to +10 pts)</p>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button id="btn-reset-age-curve" class="px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white text-[11px] font-mono transition-all" title="Reset to standard decay">
+                                    Reset
+                                </button>
+                                <button id="btn-save-age-curve" class="px-3 py-1 rounded bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-[11px] font-mono transition-all">
+                                    Save Curve
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- SVG Graph Container -->
+                        <div id="age-graph-container" class="relative bg-zinc-950 rounded-xl border border-zinc-800/90 p-2 overflow-hidden select-none">
+                            <svg id="age-graph-svg" class="w-full h-56 block"></svg>
+                            <div id="age-graph-tooltip" class="absolute pointer-events-none hidden px-2 py-1 rounded bg-zinc-900/95 border border-cyan-500/50 text-[11px] font-mono text-cyan-300 shadow-xl z-20"></div>
+                        </div>
+
+                        <div class="flex items-center justify-between text-[11px] font-mono text-zinc-500">
+                            <span>Drag points to adjust &bull; Click to add point</span>
+                            <button id="btn-add-age-point" class="text-cyan-400 hover:underline">+ Add Point</button>
+                        </div>
+
+                        <!-- Points Table/Chips Editor -->
+                        <div id="age-points-editor" class="space-y-1.5 max-h-36 overflow-y-auto pr-1"></div>
+                    </div>
+
+                    <!-- Article Length Graph -->
+                    <div class="glass-panel p-5 rounded-xl space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h4 class="text-sm font-semibold text-white flex items-center gap-2">
+                                    <i data-lucide="align-left" class="w-4 h-4 text-violet-400"></i> Article Length Weighting Curve
+                                </h4>
+                                <p class="text-[11px] text-zinc-400 mt-0.5">X: Word Count &bull; Y: Score Bias (-10 to +10 pts)</p>
+                            </div>
+                            <div class="flex items-center gap-1.5">
+                                <button id="btn-reset-length-curve" class="px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white text-[11px] font-mono transition-all" title="Reset to standard length curve">
+                                    Reset
+                                </button>
+                                <button id="btn-save-length-curve" class="px-3 py-1 rounded bg-violet-600 hover:bg-violet-500 text-white font-semibold text-[11px] font-mono transition-all">
+                                    Save Curve
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- SVG Graph Container -->
+                        <div id="length-graph-container" class="relative bg-zinc-950 rounded-xl border border-zinc-800/90 p-2 overflow-hidden select-none">
+                            <svg id="length-graph-svg" class="w-full h-56 block"></svg>
+                            <div id="length-graph-tooltip" class="absolute pointer-events-none hidden px-2 py-1 rounded bg-zinc-900/95 border border-violet-500/50 text-[11px] font-mono text-violet-300 shadow-xl z-20"></div>
+                        </div>
+
+                        <div class="flex items-center justify-between text-[11px] font-mono text-zinc-500">
+                            <span>Drag points to adjust &bull; Click to add point</span>
+                            <button id="btn-add-length-point" class="text-violet-400 hover:underline">+ Add Point</button>
+                        </div>
+
+                        <!-- Points Table/Chips Editor -->
+                        <div id="length-points-editor" class="space-y-1.5 max-h-36 overflow-y-auto pr-1"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 4: UNIFIED CURATION SCORING SANDBOX -->
             <div class="glass-panel p-5 rounded-xl border-t-2 border-t-violet-500">
                 <div class="flex items-center justify-between mb-3">
                     <div>
-                        <h3 class="text-sm font-semibold text-white">Keyword Scoring Sandbox (Dry-Run Tester)</h3>
-                        <p class="text-xs text-zinc-400">Test how your active rules evaluate an article URL or text snippet.</p>
+                        <h3 class="text-sm font-semibold text-white">Full Scoring Sandbox (Dry-Run Tester)</h3>
+                        <p class="text-xs text-zinc-400">Test how your active keywords, source bias, age recency, and word count evaluate an article.</p>
                     </div>
                 </div>
 
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <div class="space-y-3">
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <div>
+                                <label class="text-[11px] font-mono text-zinc-400 block mb-1">Simulate Source</label>
+                                <select id="sandbox-source-select" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                                    <option value="">No Source (Neutral 0.0)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-mono text-zinc-400 block mb-1">Article Age (Days)</label>
+                                <input id="sandbox-age-input" type="number" step="0.5" min="0" max="365" value="0.0" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                            </div>
+                            <div>
+                                <label class="text-[11px] font-mono text-zinc-400 block mb-1">Word Count</label>
+                                <input id="sandbox-words-input" type="number" step="50" min="0" max="50000" placeholder="Auto from text" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-2 text-xs text-white focus:outline-none focus:border-violet-500">
+                            </div>
+                        </div>
+
                         <div>
-                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">Test by URL (optional)</label>
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">Test by URL (optional fetch)</label>
                             <input id="sandbox-url-input" type="url" placeholder="https://example.com/article" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500">
                         </div>
                         <div>
-                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">Or Sample Title</label>
+                            <label class="text-[11px] font-mono text-zinc-400 block mb-1">Sample Title</label>
                             <input id="sandbox-title-input" type="text" placeholder="Title for testing" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500">
                         </div>
                         <div>
                             <label class="text-[11px] font-mono text-zinc-400 block mb-1">Sample Body Text</label>
-                            <textarea id="sandbox-content-input" rows="4" placeholder="Paste article paragraph here..." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500"></textarea>
+                            <textarea id="sandbox-content-input" rows="3" placeholder="Paste article paragraph here..." class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-violet-500"></textarea>
                         </div>
                         <button id="sandbox-evaluate-btn" class="w-full py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-all">
                             <i data-lucide="play" class="w-3.5 h-3.5"></i> Run Scoring Test
@@ -243,13 +366,13 @@
 
                     <div class="bg-zinc-950 p-4 rounded-xl border border-zinc-800 flex flex-col justify-between">
                         <div>
-                            <span class="text-xs font-mono text-zinc-400 uppercase tracking-wider block mb-2">Scoring Breakdown</span>
+                            <span class="text-xs font-mono text-zinc-400 uppercase tracking-wider block mb-2">Composite Score Breakdown</span>
                             <div id="sandbox-results" class="space-y-2">
-                                <p class="text-zinc-600 font-mono text-xs italic">Submit sample text on the left to see score calculation.</p>
+                                <p class="text-zinc-600 font-mono text-xs italic">Submit sample parameters on the left to see full score breakdown.</p>
                             </div>
                         </div>
                         <div class="mt-4 pt-3 border-t border-zinc-800/80 text-[11px] text-zinc-500 font-mono">
-                            Scoring formula: Title hits (3x) + Body hits (1x) &times; Weight.
+                            Total Score = max(0, Keywords + Source Bias + Age Recency + Word Length)
                         </div>
                     </div>
                 </div>
@@ -405,6 +528,12 @@
                             <span id="preview-mode" class="px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 text-[10px] font-mono uppercase"></span>
                         </div>
                         <input id="preview-feed-url-input" type="text" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-zinc-300 font-mono focus:outline-none focus:border-cyan-500" readonly>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-mono text-zinc-400 uppercase">Source Weight Bias (-10.0 to +10.0 pts)</label>
+                        <input id="preview-source-weight-input" type="number" step="0.5" value="0.0" min="-10" max="10" class="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500">
+                        <span class="text-[10px] text-zinc-500">Positive values boost articles from this source; negative values deprioritize them.</span>
                     </div>
 
                     <div>

@@ -5,6 +5,14 @@ class SourceCreate(BaseModel):
     url: str
     name: str | None = None
     feed_url: str | None = None
+    weight: float = 0.0
+
+class SourceUpdate(BaseModel):
+    name: str | None = None
+    feed_url: str | None = None
+    crawl_mode: str | None = None
+    is_active: bool | None = None
+    weight: float | None = None
 
 class SourceResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -15,6 +23,7 @@ class SourceResponse(BaseModel):
     feed_url: str | None
     crawl_mode: str
     is_active: bool
+    weight: float = 0.0
     last_crawled_at: datetime | None
     last_status: str
     error_message: str | None
@@ -35,6 +44,13 @@ class KeywordCreate(BaseModel):
     is_excluded: bool = False
     match_type: str = "contains"
 
+class KeywordUpdate(BaseModel):
+    term: str | None = None
+    weight: float | None = None
+    is_required: bool | None = None
+    is_excluded: bool | None = None
+    match_type: str | None = None
+
 class KeywordResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -46,10 +62,21 @@ class KeywordResponse(BaseModel):
     match_type: str
     created_at: datetime
 
+class CurvePoint(BaseModel):
+    x: float
+    y: float
+
+class CurationCurves(BaseModel):
+    age_curve: list[CurvePoint]
+    length_curve: list[CurvePoint]
+
 class KeywordEvaluateRequest(BaseModel):
     title: str = ""
     content: str = ""
     url: str = ""
+    source_id: str | None = None
+    published_at: datetime | None = None
+    word_count: int | None = None
 
 class KeywordEvaluateResponse(BaseModel):
     score: float

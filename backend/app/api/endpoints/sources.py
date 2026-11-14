@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 from backend.app.core.database import get_db
 from backend.app.models.entities import Source, Article
-from backend.app.schemas.api_models import SourceCreate, SourceResponse, SourceProbeResponse
+from backend.app.schemas.api_models import SourceCreate, SourceUpdate, SourceResponse, SourceProbeResponse
 from backend.app.services.crawler.fetcher import create_http_client
 from backend.app.services.crawler.discovery import DiscoveryService
 from backend.app.services.scheduler.runner import ingest_source
@@ -73,6 +73,7 @@ async def add_source(payload: SourceCreate, bg: BackgroundTasks, db: AsyncSessio
         feed_url=final_feed_url,
         crawl_mode=final_crawl_mode,
         is_active=True,
+        weight=payload.weight,
         last_status="idle"
     )
     db.add(source)
@@ -84,6 +85,32 @@ async def add_source(payload: SourceCreate, bg: BackgroundTasks, db: AsyncSessio
 
     resp = SourceResponse.model_validate(source)
     resp.article_count = 0
+    return resp
+
+@router.patch("/{source_id}", response_model=SourceResponse)
+async def update_source(source_id: str, payload: SourceUpdate, db: AsyncSession = Depends(get_db)):
+    res = await db.execute(select(Source).where(Source.id == source_id))
+    source = res.scalar_one_or_none()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    if payload.name is not None:
+        source.name = payload.name.strip()
+    if payload.feed_url is not None:
+        source.feed_url = payload.feed_url.strip() or None
+    if payload.crawl_mode is not None:
+        source.crawl_mode = payload.crawl_mode
+    if payload.is_active is not None:
+        source.is_active = payload.is_active
+    if payload.weight is not None:
+        source.weight = payload.weight
+
+    await db.commit()
+    await db.refresh(source)
+
+    count_res = await db.execute(select(func.count(Article.id)).where(Article.source_id == source.id))
+    resp = SourceResponse.model_validate(source)
+    resp.article_count = count_res.scalar() or 0
     return resp
 
 @router.post("/{source_id}/crawl")

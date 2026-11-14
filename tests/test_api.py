@@ -37,6 +37,13 @@ async def test_keyword_crud_and_evaluate():
         terms = [k["term"] for k in list_resp.json()]
         assert "robotics" in terms
 
+        # Update Keyword Weight (PATCH)
+        patch_resp = await ac.patch(f"/api/v1/keywords/{kw_id}", json={
+            "weight": 4.0
+        })
+        assert patch_resp.status_code == 200
+        assert patch_resp.json()["weight"] == 4.0
+
         # Evaluate Sandbox
         eval_resp = await ac.post("/api/v1/keywords/evaluate", json={
             "title": "Robotics in Space Exploration",
@@ -92,3 +99,32 @@ async def test_direct_feed_probe_and_multiple_feeds_same_domain():
         # Cleanup
         await ac.delete(f"/api/v1/sources/{src1['id']}")
         await ac.delete(f"/api/v1/sources/{src2['id']}")
+
+@pytest.mark.asyncio
+async def test_curation_curves_and_source_weight_api():
+    await init_db()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        # 1. Get Curves
+        curves_resp = await ac.get("/api/v1/curation/curves")
+        assert curves_resp.status_code == 200
+        curves = curves_resp.json()
+        assert "age_curve" in curves
+        assert "length_curve" in curves
+        assert len(curves["age_curve"]) > 0
+
+        # 2. Update Curves
+        new_age = [{"x": 0.0, "y": 6.0}, {"x": 5.0, "y": 2.0}, {"x": 30.0, "y": -5.0}]
+        new_len = [{"x": 0.0, "y": -2.0}, {"x": 1000.0, "y": 4.0}]
+        put_resp = await ac.put("/api/v1/curation/curves", json={
+            "age_curve": new_age,
+            "length_curve": new_len
+        })
+        assert put_resp.status_code == 200
+        saved = put_resp.json()
+        assert len(saved["age_curve"]) == 3
+
+        # 3. Recalculate scores
+        recalc_resp = await ac.post("/api/v1/curation/recalculate-scores")
+        assert recalc_resp.status_code == 200
+        assert "updated_articles" in recalc_resp.json()

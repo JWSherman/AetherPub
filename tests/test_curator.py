@@ -66,3 +66,48 @@ def test_keyword_scorer_required_missing():
     # Missing 'tutorial'
     score = KeywordScorer.score_article(title, body, keywords)
     assert score == 0.0
+
+def test_interpolate_curve():
+    from backend.app.services.curator.scorer import interpolate_curve
+    curve = [{"x": 0.0, "y": 10.0}, {"x": 10.0, "y": 0.0}]
+    assert interpolate_curve(curve, -5.0) == 10.0
+    assert interpolate_curve(curve, 0.0) == 10.0
+    assert interpolate_curve(curve, 5.0) == 5.0
+    assert interpolate_curve(curve, 10.0) == 0.0
+    assert interpolate_curve(curve, 15.0) == 0.0
+
+def test_keyword_scorer_source_and_curve_weights():
+    from datetime import datetime, timezone, timedelta
+    kw = Keyword(term="robotics", weight=2.0, is_required=False, is_excluded=False)
+    keywords = [kw]
+
+    title = "Robotics Revolution"
+    body = "Advanced robotics are transforming factories."
+
+    # Base score: robotics in title (3 * 2.0) + robotics in body (1 * 2.0) = 8.0
+    # Add source weight: +3.0
+    # Add age curve: 0d -> +5.0
+    # Add length curve: 50w -> 0.0
+    now = datetime.now(timezone.utc)
+    age_curve = [{"x": 0.0, "y": 5.0}, {"x": 10.0, "y": 0.0}]
+    length_curve = [{"x": 0.0, "y": 0.0}, {"x": 500.0, "y": 5.0}]
+
+    score, breakdown, is_ex, is_req = KeywordScorer.evaluate(
+        title=title,
+        text=body,
+        keywords=keywords,
+        source_weight=3.0,
+        published_at=now,
+        word_count=50,
+        age_curve=age_curve,
+        length_curve=length_curve
+    )
+    assert is_ex is False
+    assert is_req is False
+    # 8.0 (keyword) + 3.0 (source) + 5.0 (age) + 0.5 (length: 50/500 * 5.0 = 0.5) = 16.5
+    assert score == 16.5
+    types = [b["type"] for b in breakdown]
+    assert "weighted" in types
+    assert "source" in types
+    assert "age" in types
+    assert "length" in types
